@@ -50,7 +50,7 @@
  * the control point of the previous command relative to the current point.
  * 
  */
-$obj = SVGCaptcha::getInstance(5, 700, 300);
+$obj = SVGCaptcha::getInstance(5, 700, 300, $difficulty = SVGCaptcha::MEDIUM);
 $obj->generate();
 
 class SVGCaptcha {
@@ -81,24 +81,50 @@ EOD;
     private $numchars = 0;
     private $width = 0;
     private $height = 0;
+    private $difficulty;
+    // Multidimensional array holding the difficulty settings
+    // The boolean value at index 0 indicates whether to use the function.
+    // p indicates the probability 1/p
+    private $dsettings = array(
+        'transformations' => array('apply' => False, 'rotate' => False, 'skew' => False, 'scale' => False, 'shear' => False, 'translate' => False),
+        'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => NUll),
+        'change_degree' => array('apply' => False, 'p' => 5),
+        'split_curve' => array('apply' => False, 'p' => 5),
+        'shapeify' => array('apply' => False, 'r_num_shapes' => NULL, 'r_num_gp' => NULL)
+    );
 
-    const DEBUG = TRUE;
-    const VERBOSE = TRUE;
+    const DEBUG = FALSE;
+    const VERBOSE = FALSE;
+    // Difficulty constants
+    const EASY = 1;
+    const MEDIUM = 2;
+    const HARD = 3;
 
     // The answer to the generated captcha.
     private $captcha_answer = "";
 
-    public function getInstance($numchars, $width, $height) {
+    public function getInstance($numchars, $width, $height, $difficulty = SVGCaptcha::MEDIUM) {
         if (!isset(self::$instance))
-            self::$instance = new SVGCaptcha($numchars, $width, $height);
+            self::$instance = new SVGCaptcha($numchars, $width, $height, $difficulty);
 
         return self::$instance;
     }
 
-    private function __construct($numchars, $width, $height) {
+    private function __construct($numchars, $width, $height, $difficulty) {
         $this->numchars = $numchars;
         $this->width = $width;
         $this->height = $height;
+        $this->difficulty = $difficulty;
+
+        // Set the parameters for the algorithms according to the user 
+        // supplied difficulty.
+        if ($this->difficulty == self::EASY) {
+            
+        } else if ($this->difficulty == self::MEDIUM) {
+            
+        } else if ($this->difficulty == self::HARD) {
+            
+        }
     }
 
     /**
@@ -167,7 +193,9 @@ EOD;
          * with affine transformations. It is imported to call this function before the glyphs become aligned, in order for
          * the affine transformations to relate to a constant coordinate system.
          */
-        $this->_apply_affine_transformations($packed);
+        if ($this->dsettings['transformations']['apply']) {
+            $this->_apply_affine_transformations($packed);
+        }
 
         /*
          * Now every glyph has a unique size (as defined by their typeface) and they overlap all more or less if we would draw them directly.
@@ -195,8 +223,9 @@ EOD;
         shuffle($shapearray);
 
         /* Insert some randomly generated shapes in the shapearray */
-        $this->_shapeify($shapearray);
-
+        if ($this->dsettings['shapeify']['apply']) {
+            $shapearray = $this->_shapeify($shapearray);
+        }
 
         /*
          * Here is the part where the rest of the magic happens!
@@ -210,14 +239,19 @@ EOD;
          */
 
         // Executes an curve downgrade/upgrade from times to times :P
-        $this->_maybe_change_curvature_degree($shapearray);
+        if ($this->dsettings['change_degree']['apply']) {
+            $this->_maybe_change_curvature_degree($shapearray);
+        }
 
         // Maybe split a single curve into two subcurves
-        $shapearray = $this->_maybe_split_curve($shapearray);
+        if ($this->dsettings['split_curve']['apply']) {
+            $shapearray = $this->_maybe_split_curve($shapearray);
+        }
 
         // Approximates a curve with lines on a random base or the other way around.
-        $shapearray = $this->_maybe_approximate_xor_make_curvaceous($shapearray);
-
+        if ($this->dsettings['approx_shapes']['apply']) {
+            $shapearray = $this->_maybe_approximate_xor_make_curvaceous($shapearray);
+        }
 
         // Shuffle once more
         shuffle($shapearray);
@@ -255,10 +289,72 @@ EOD;
     /**
      * Insert ranomly generated shapes into the shapearray(mandelbrot like distortios would be awesome!).
      * 
+     * The idea is to replace certain basic shapes such as curves or lines with a geometrical 
+     * figure that distorts the overall picture of the glyph. Such a figure could be generated randomly, the 
+     * only constraints are, that the start point and end point of the replaced shape coincide with the 
+     * randomly generated substitute.
+     * 
+     * A second approach is to add such random shapes without replacing existing ones. 
+     * 
+     * This function does both of the above. The purposes for this procedure is to make
+     * OCR techniques more cumbersome.
+     * 
+     * Note: Currently, only the second construct is implemented due to the likely
+     * difficulty involving the first idea.
+     * 
      * @param type $shapearray array
      */
-    private function _shapeify(&$shapearray) {
-        
+    private function _shapeify($shapearray) {
+        $random_shapes = array();
+
+        $random_shape = function() {
+            $rshapes = array();
+            // Bounding points that constrain the maximal shape expansion
+            $min = new Point(0, 0);
+            $max = new Point($this->width, $this->height);
+            // Get a start point
+            $previous = $startp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+            // Of how many random geometrical primitives should our random shape consist?
+            $ngp = secure_random_number(4, 9);
+
+            foreach (range(0, $ngp) as $j) {
+                // Find a random endpoint for geometrical primitves
+                // If there are only 4 remaining shapes to add, choose a random point that
+                // is closer to the endpoint!
+                $rp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+                if (($ngp - 4) <= $j) {
+                    $rp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+                    // Make the component closer to the startpoint that is currently wider away
+                    // This ensures that the component switches over the iterations (most likely).
+                    $axis = abs($startp->x - $rp->x) > abs($startp->y - $rp->y) ? 'x' : 'y';
+                    if ($axis === 'x') {
+                        $rp->x += ($startp->x > $rp->x) ? abs($startp->x - $rp->x) / 4 : abs($startp->x - $rp->x) / -4;
+                    } else {
+                        $rp->y += ($startp->y > $rp->y) ? abs($startp->y - $rp->y) / 4 : abs($startp->y - $rp->y) / -4;
+                    }
+                }
+
+                if ($j == ($ngp - 1)) { // Close the shape. With a line
+                    $rshapes[] = array($previous, $startp);
+                    break;
+                } else if (rand(0, 1) == 1) { // Add a line
+                    $rshapes[] = array($previous, $rp);
+                } else { // Add quadratic bezier curve
+                    $rshapes[] = array($previous, new Point($previous->x, $rp->y), $rp);
+                }
+
+                $previous = $rp;
+            }
+            return $rshapes;
+        };
+        // How many random shapes? 
+        $ns = secure_random_number(0, 5);
+
+        foreach (range(0, $ns) as $i) {
+            $random_shapes = array_merge($random_shapes, $random_shape());
+        }
+
+        return array_merge($shapearray, $random_shapes);
     }
 
     /**
@@ -338,7 +434,7 @@ EOD;
         $merge = array(); // Accumulating the new shapes
 
         foreach ($shapearray as $key => $shape) {
-            $do_change = (bool) (secure_random_number(0, 4) == 4);
+            $do_change = (bool) (secure_random_number(0, 3) == 3);
             if ($do_change) {
                 if ((count($shape) == 3 || count($shape) == 4)) {
                     self::V("approximating curve with lines");
@@ -351,17 +447,12 @@ EOD;
                      * your imagination
                      */
                     self::V("approximating lines by curves");
-                    $dk[] = $key;
-                    $merge[] = $this->_approximate_line($shape);
+                    $shapearray[$key] = $this->_approximate_line($shape);
                 }
             }
         }
-        
-        foreach (array_values($dk) as $delete_key) {
-            unset($shapearray[$delete_key]);
-        }
-
-        return array_merge($merge, $shapearray);
+        // Soem array kung fu to get rid of the duplicate shapes
+        return array_merge($merge, array_diff_key($shapearray, array_fill_keys($dk, 0)));
     }
 
     /**
@@ -514,6 +605,7 @@ EOD;
             foreach ($data as &$value) {
                 $this->on_points($value, $callback, $args);
             }
+            unset($value);
         }
 
         return; // Do nothing, return nothing, just return anything :P
@@ -633,8 +725,10 @@ EOD;
      * @return type
      */
     private function _approximate_line($line) {
-        if (count($line) != 2) {
-            throw new InvalidArgumentException("Argument is not an array of two points");
+        if (count($line) != 2 || !($line[0] instanceof Point) || !($line[1] instanceof Point)) {
+            throw new InvalidArgumentException(__FUNCTION__ . ": Argument is not an array of two points");
+        } else if ($line[0]->_equals($line[1])) {
+            //throw new InvalidArgumentException(__FUNCTION__.": {$line[0]} and {$line[1]} are equal.");
         }
         /*
           There are several ways to make a bezier curve look like a line. We need to have a threshold
@@ -667,14 +761,15 @@ EOD;
             // Remember: f(x) = mx + d
             // But watch out! Lines parallel to the y-axis promise trouble! Just change these a bit :P
             if (($line[1]->x - $line[0]->x) == 0) {
-                $line[1]->x++;
+                $line[1]->x += 1;
             }
             // Get the coefficient m and the (0, d)-y-intersection.
             $m = ($line[1]->y - $line[0]->y) / ($line[1]->x - $line[0]->x);
             $d = ($line[1]->x * $line[0]->y - $line[0]->x * $line[1]->y) / ($line[1]->x - $line[0]->x);
-            
+
             if ($maxx < 0 || $minx < 0) { // Some strange cases oO
-                $ma = max(abs($maxx), abs($minx)); $mi = min(abs($maxx), abs($minx));
+                $ma = max(abs($maxx), abs($minx));
+                $mi = min(abs($maxx), abs($minx));
                 $x = - secure_random_number($mi, $ma);
             } else {
                 $x = secure_random_number($minx, $maxx);
@@ -721,7 +816,7 @@ EOD;
                 list($p1, $p2, $p3) = $curve;
                 $last = $p1;
                 $lines = array();
-                for ($i = 0; $i < $nlines; $i++) {
+                for ($i = 0; $i <= $nlines; $i++) {
                     $t = $i / $nlines;
                     $t2 = $t * $t;
                     $mt = 1 - $t;
@@ -738,7 +833,7 @@ EOD;
                 list($p1, $p2, $p3, $p4) = $curve;
                 $last = $p1;
                 $lines = array();
-                for ($i = 0; $i < $nlines; $i++) {
+                for ($i = 0; $i <= $nlines; $i++) {
                     $t = $i / $nlines;
                     $t2 = $t * $t;
                     $t3 = $t2 * $t;
@@ -839,6 +934,14 @@ class Point {
 
     public function __toString() {
         return 'Point(x=' . $this->x . ', y=' . $this->y . ')';
+    }
+
+    public function _equals($p) {
+        if ($p instanceof Point) {
+            return ($this->x == $p->x && $this->y == $p->y);
+        } else {
+            return False;
+        }
     }
 
 }
@@ -1035,5 +1138,6 @@ if (!function_exists('array_column')) {
 
         return $resultArray;
     }
+
 }
 ?>

@@ -90,7 +90,7 @@ function _approximate_bezier($curve, $nlines = False) {
             list($p1, $p2, $p3) = $curve;
             $last = $p1;
             $lines = array();
-            for ($i = 0; $i < $nlines; $i++) {
+            for ($i = 0; $i <= $nlines; $i++) {
                 $t = $i / $nlines;
                 $t2 = $t * $t;
                 $mt = 1 - $t;
@@ -107,7 +107,7 @@ function _approximate_bezier($curve, $nlines = False) {
             list($p1, $p2, $p3, $p4) = $curve;
             $last = $p1;
             $lines = array();
-            for ($i = 0; $i < $nlines; $i++) {
+            for ($i = 0; $i <= $nlines; $i++) {
                 $t = $i / $nlines;
                 $t2 = $t * $t;
                 $t3 = $t2 * $t;
