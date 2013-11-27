@@ -50,7 +50,7 @@
  * the control point of the previous command relative to the current point.
  * 
  */
-$obj = SVGCaptcha::getInstance(5, 700, 300, $difficulty = SVGCaptcha::EASY);
+$obj = SVGCaptcha::getInstance(5, $width = 700, $height = 300, $difficulty = SVGCaptcha::MEDIUM);
 $obj->generate();
 
 class SVGCaptcha {
@@ -68,7 +68,7 @@ class SVGCaptcha {
    height="{{height}}"
    id="svgCaptcha"
    version="1.1"
-   style="background:#00a">
+   style="border:solid 2px #0A0">
   <title>SVGCaptcha</title>
   <g>
     <path
@@ -83,10 +83,13 @@ EOD;
     private $height = 0;
     private $difficulty;
     // Multidimensional array holding the difficulty settings
-    // The boolean value at index 0 indicates whether to use the function.
-    // p indicates the probability 1/p
+    // The boolean value with key "apply" indicates whether to use/apply the function.
+    // "p indicates the probability 1/p of usages for the function.
     private $dsettings = array(
-        'glyph_offsetting' => array('apply' => False, 'h' => NULL, 'v' => NULL),
+        // h: The fraction of the maximally possible horizontal align based on the previous glyph. 
+        // v: The fraction of the maximally allowed vertical alignment based on the current glyph height.
+        // mh: The minimal vertical offset expressed as the divisor of the current glyph height.
+        'glyph_offsetting' => array('apply' => True, 'h' => 0.75, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
         'transformations' => array('apply' => False, 'rotate' => False, 'skew' => False, 'scale' => False, 'shear' => False, 'translate' => False),
         'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => NUll),
         'change_degree' => array('apply' => False, 'p' => 5),
@@ -144,8 +147,14 @@ EOD;
             $this->dsettings["transformations"]["apply"] = True;
             $this->dsettings["transformations"]["rotate"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
-            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 2);
-            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 4);
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 5);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(2, 4);
+            $this->dsettings["approx_shapes"]["apply"] = True;
+            $this->dsettings["approx_shapes"]["p"] = 5;
+            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 10);
+            $this->dsettings["change_degree"]["apply"] = True;
+            $this->dsettings["change_degree"]["p"] = 5;
+            $this->dsettings["split_curve"]["apply"] = True;
             
         } else if ($this->difficulty == self::MEDIUM) {
             $this->dsettings["transformations"]["apply"] = True;
@@ -153,8 +162,8 @@ EOD;
             $this->dsettings["transformations"]["skew"] = True;
             $this->dsettings["transformations"]["scale"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
-            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 4);
-            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 5);
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 5);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 6);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 3;
             $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 16);
@@ -169,13 +178,13 @@ EOD;
             $this->dsettings["transformations"]["shear"] = True;
             $this->dsettings["transformations"]["translate"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
-            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 8);
-            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 7);
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(3, 8);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(4, 8);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 2;
-            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 26);
+            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(6, 26);
             $this->dsettings["change_degree"]["apply"] = True;
-            $this->dsettings["change_degree"]["p"] = 4;
+            $this->dsettings["change_degree"]["p"] = 3;
             $this->dsettings["split_curve"]["apply"] = True;
         }
     }
@@ -236,7 +245,7 @@ EOD;
         }
 
         /*
-         * First of all, the glyphs need to be scaled such that the biggest glyph becomes half the 
+         * First of all, the glyphs need to be scaled such that the biggest glyph becomes a fraction of the 
          * height of the overall height.
          */
         $this->_scale_by_largest_glyph($packed);
@@ -252,11 +261,13 @@ EOD;
 
         /*
          * Now every glyph has a unique size (as defined by their typeface) and they overlap all more or less if we would draw them directly.
-         * Therefore we need to align them horizontally/vertically such that the (n+1)-th glyph overlaps not more than to the horizontal mid of the n-th glyph.
+         * Therefore we need to align them horizontally/vertically such that the (n+1)-th glyph overlaps not more than to than half of the horizontal width of the n-th glyph.
          * 
          * In order to do so, we need to know the widths/heights of the glyphs. It is assumed that this information is held in the alphabet array.
          */
-        $this->_align_randomly($packed);
+        if ($this->dsettings["glyph_offsetting"]["apply"]) {
+            $this->_align_randomly($packed);
+        }
 
         /*
          * Finally, we generate a single array of shapes, and then shuffle it. Therefore we cannot 
@@ -401,8 +412,8 @@ EOD;
             return $rshapes;
         };
         // How many random shapes? 
-        $ns = secure_rand(min($this->dsettings["shapeify"]["r_num_gp"]),
-                                        max($this->dsettings["shapeify"]["r_num_gp"]));
+        $ns = secure_rand(min($this->dsettings["shapeify"]["r_num_shapes"]),
+                                        max($this->dsettings["shapeify"]["r_num_shapes"]));
 
         foreach (range(0, $ns) as $i) {
             $random_shapes = array_merge($random_shapes, $random_shape());
@@ -544,14 +555,15 @@ EOD;
     }
 
     /**
-     * Scales all the glyphs by the glyph with the biggest height.
+     * Scales all the glyphs by the glyph with the biggest height such that 
+     * the lagerst glyph is 2/3 of the pictue height.
      * 
      * @param type $glyphs array
      */
     private function _scale_by_largest_glyph(&$glyphs) {
         // $this->width = 2 * $my*$what <=> $what = $this->width/2/$my
         $my = max(array_column($glyphs, "height"));
-        $scale_factor = ($this->height / 2) / $my;
+        $scale_factor = ($this->height / 1.5) / $my;
 
         $this->on_points(
                 $glyphs, array($this, "_scale"), array($scale_factor)
@@ -567,26 +579,30 @@ EOD;
     /**
      * Algins the glyphs horizontally and vertically in a random way.
      * 
-     * @param type $glyphs The glyphs to algin.
+     * @param array $glyphs The glyphs to algin.
      */
     private function _align_randomly(&$glyphs) {
         $accumulated_hoffset = 0;
         $lastxo = 0;
         $lastyo = 0;
-        $overlapf = 2 / 3;
+        $cnt = 0;
+        $overlapf_h = $this->dsettings["glyph_offsetting"]["h"]; // Successive glyphs overlap previous glyphs at least to overlap * length of the previous glyphs.
+        $overlapf_v = $this->dsettings["glyph_offsetting"]["v"]; // The maximal y-offset based on the current glyph height.
         foreach ($glyphs as &$glyph) {
             // Get a random x-offset based on the width of the previous glyph divided by two.
-            $accumulated_hoffset += secure_rand($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
+            $accumulated_hoffset += ($cnt == 0) ? 0 : secure_rand($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
             // Get a random y-offst based on the height of the current glyph.
-            $h = round($glyph['height'] * $overlapf);
-            $yoffset = secure_rand((10 > $h ? $h : 10), $h);
-            // Translate all points by the calculated offset.
+            $h = round($glyph['height'] * $overlapf_v);
+            $svo = $this->height/$this->dsettings["glyph_offsetting"]["mh"];
+            $yoffset = secure_rand(($svo > $h ? 0 : $svo), $h);
+            // Translate all points by the calculated offset. Except the very firs glyph. This should start left aligned.
             $this->on_points(
                     $glyph["glyph_data"], array($this, "_translate"), array($accumulated_hoffset, $yoffset)
             );
 
-            $lastxo = round($glyph['width'] * $overlapf);
-            $lastyo = round($glyph['height'] * $overlapf);
+            $lastxo = round($glyph['width'] * $overlapf_h);
+            $lastyo = round($glyph['height'] * $overlapf_h);
+            $cnt++;
         }
         /*
          * Reevaluate the width of the image by the accumulated offset + 
@@ -595,7 +611,7 @@ EOD;
          * 
          */
         $this->width = $accumulated_hoffset + $glyph["width"] +
-                secure_rand($glyph["width"] * $overlapf, $glyph["width"]);
+                secure_rand($glyph["width"] * $overlapf_h, $glyph["width"]);
     }
 
     /*
@@ -1057,16 +1073,7 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
         throw new InvalidArgumentException("Either stop<start or negative input parameters. Arguments: start=$start, stop=$stop");
     }
     static $LUT; // Lookup table that holds always the last bytes as received by openssl_random_pseudo_bytes.
-    /* Before we do anything, lets see if we have a random value in the LUT */
-    if (is_array($LUT) && !empty($LUT)) {
-        foreach ($LUT as $key => $value) {
-            if ($value >= $start && $value <= $stop) {
-                $secure = True;
-                unset($LUT[$key]); // Next run, next value, as my dad always said!
-                return $value;
-            }
-        }
-    }
+    static $last_lu;
     $num_bytes = 1024;
 
     /* Just look for a random value within the difference of the range */
@@ -1081,6 +1088,17 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
     } elseif ($range >= 65536 && $range < 4294967296) {
         $format = 'L';
         $num_bytes <<= 3;
+    }
+    
+    /* Before we do anything, lets see if we have a random value in the LUT within our range */
+    if (is_array($LUT) && !empty($LUT) && $last_lu === $format) {
+        foreach ($LUT as $key => $value) {
+            if ($value >= $start && $value <= $stop) {
+                $secure = True;
+                unset($LUT[$key]); // Next run, next value, as my dad always said!
+                return $value;
+            }
+        }
     }
 
     /* Get a blob of cryptographically secure random bytes */
@@ -1098,6 +1116,7 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
 
     //Update lookup-table
     $LUT = $data;
+    $last_lu = $format;
 
     foreach ($data as $value) {
         $value = intval($value, $base = 10);
