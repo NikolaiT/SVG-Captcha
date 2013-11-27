@@ -81,7 +81,7 @@ function _approximate_bezier($curve, $nlines = False) {
     }
     
     if (!$nlines || !isset($nlines)) {
-        $nlines = secure_random_number(4, 20);
+        $nlines = secure_rand(4, 20);
     }
     $approx_func = nUlL; // because PHP sucks!
 
@@ -128,7 +128,7 @@ function _approximate_bezier($curve, $nlines = False) {
     return $approx_func($curve, $nlines);
 }
 
-function secure_random_number($start, $stop, &$secure = "True") {
+function secure_rand($start, $stop, &$secure = "True") {
     static $calls = 0;
     $num_bytes = 1024;
 
@@ -172,7 +172,7 @@ function secure_random_number($start, $stop, &$secure = "True") {
         $secure = False;
         return rand($start, $stop);
     } else /* If we could't locate integer in the range, try again as long as we do not try more than 50 times. */
-        return secure_random_number($start, $stop, $secure);
+        return secure_rand($start, $stop, $secure);
 }
 
 function D($a) {

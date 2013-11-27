@@ -86,7 +86,7 @@ function _approximate_line($line) {
     // line lengths? Yep, I actually DO remember something for once from my maths courses :/
     $d = sqrt(pow(abs($line[0]->x - $line[1]->x), 2) + pow(abs($line[0]->y - $line[1]->y), 2));
     // The control points are allowed to be maximally a 10th of the line width apart from the line distance.
-    $md = $d / secure_random_number(10, 50);
+    $md = $d / secure_rand(10, 50);
 
     $somewhere_near_the_line = function($line, $md) {
         // Such a point must be within the bounding rectangle of the line.
@@ -104,7 +104,7 @@ function _approximate_line($line) {
         $m = ($line[1]->y - $line[0]->y) / ($line[1]->x - $line[0]->x);
         $d = ($line[1]->x * $line[0]->y - $line[0]->x * $line[1]->y) / ($line[1]->x - $line[0]->x);
         
-        $x = secure_random_number($minx, $maxx);
+        $x = secure_rand($minx, $maxx);
         $y = $m * $x + $d;
         
         // And move it away by $md :P
@@ -123,7 +123,7 @@ function _approximate_line($line) {
     return $curve;
 }
 
-function secure_random_number($start, $stop, &$secure = "True") {
+function secure_rand($start, $stop, &$secure = "True") {
     static $calls = 0;
     $num_bytes = 1024;
 
@@ -167,7 +167,7 @@ function secure_random_number($start, $stop, &$secure = "True") {
         $secure = False;
         return rand($start, $stop);
     } else /* If we could't locate integer in the range, try again as long as we do not try more than 50 times. */
-        return secure_random_number($start, $stop, $secure);
+        return secure_rand($start, $stop, $secure);
 }
 
 function D($a) {

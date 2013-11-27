@@ -50,7 +50,7 @@
  * the control point of the previous command relative to the current point.
  * 
  */
-$obj = SVGCaptcha::getInstance(5, 700, 300, $difficulty = SVGCaptcha::MEDIUM);
+$obj = SVGCaptcha::getInstance(5, 700, 300, $difficulty = SVGCaptcha::EASY);
 $obj->generate();
 
 class SVGCaptcha {
@@ -86,6 +86,7 @@ EOD;
     // The boolean value at index 0 indicates whether to use the function.
     // p indicates the probability 1/p
     private $dsettings = array(
+        'glyph_offsetting' => array('apply' => False, 'h' => NULL, 'v' => NULL),
         'transformations' => array('apply' => False, 'rotate' => False, 'skew' => False, 'scale' => False, 'shear' => False, 'translate' => False),
         'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => NUll),
         'change_degree' => array('apply' => False, 'p' => 5),
@@ -103,6 +104,19 @@ EOD;
     // The answer to the generated captcha.
     private $captcha_answer = "";
 
+    /**
+     * Singleton pattern. A SVGCaptcha instance only exists once manages it's unique object.
+     * It follows basically a factory pattern.
+     * 
+     * This constructor wrapper is called to create such a unique instance. If this is called more than 
+     * once, it just returns the single instance of SVGCaptcha that it keeps in a static variable.
+     * 
+     * @param type $numchars
+     * @param type $width
+     * @param type $height
+     * @param type $difficulty
+     * @return type
+     */
     public function getInstance($numchars, $width, $height, $difficulty = SVGCaptcha::MEDIUM) {
         if (!isset(self::$instance))
             self::$instance = new SVGCaptcha($numchars, $width, $height, $difficulty);
@@ -110,6 +124,14 @@ EOD;
         return self::$instance;
     }
 
+    /**
+     * The constructor. It creates a SVGCatpcha object (What else?).
+     * 
+     * @param int $numchars The number of glyphs the captcha will contain.
+     * @param int $width The width of the captcha.
+     * @param int $height The height of the captcha.
+     * @param int $difficulty The difficulty of the captcha to generate. Bigger values tend to decrease the performance.
+     */
     private function __construct($numchars, $width, $height, $difficulty) {
         $this->numchars = $numchars;
         $this->width = $width;
@@ -119,11 +141,42 @@ EOD;
         // Set the parameters for the algorithms according to the user 
         // supplied difficulty.
         if ($this->difficulty == self::EASY) {
+            $this->dsettings["transformations"]["apply"] = True;
+            $this->dsettings["transformations"]["rotate"] = True;
+            $this->dsettings["shapeify"]["apply"] = True;
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 2);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 4);
             
         } else if ($this->difficulty == self::MEDIUM) {
-            
+            $this->dsettings["transformations"]["apply"] = True;
+            $this->dsettings["transformations"]["rotate"] = True;
+            $this->dsettings["transformations"]["skew"] = True;
+            $this->dsettings["transformations"]["scale"] = True;
+            $this->dsettings["shapeify"]["apply"] = True;
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 4);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 5);
+            $this->dsettings["approx_shapes"]["apply"] = True;
+            $this->dsettings["approx_shapes"]["p"] = 3;
+            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 16);
+            $this->dsettings["change_degree"]["apply"] = True;
+            $this->dsettings["change_degree"]["p"] = 5;
+            $this->dsettings["split_curve"]["apply"] = True;
         } else if ($this->difficulty == self::HARD) {
-            
+            $this->dsettings["transformations"]["apply"] = True;
+            $this->dsettings["transformations"]["rotate"] = True;
+            $this->dsettings["transformations"]["skew"] = True;
+            $this->dsettings["transformations"]["scale"] = True;
+            $this->dsettings["transformations"]["shear"] = True;
+            $this->dsettings["transformations"]["translate"] = True;
+            $this->dsettings["shapeify"]["apply"] = True;
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 8);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 7);
+            $this->dsettings["approx_shapes"]["apply"] = True;
+            $this->dsettings["approx_shapes"]["p"] = 2;
+            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 26);
+            $this->dsettings["change_degree"]["apply"] = True;
+            $this->dsettings["change_degree"]["p"] = 4;
+            $this->dsettings["split_curve"]["apply"] = True;
         }
     }
 
@@ -159,7 +212,7 @@ EOD;
         /* Start by choosing $clength random glyphs from the alphabet and store them in $selected */
         $chars_alphabet = array_keys($alphabet);
         for ($i = 0; $i < $this->numchars; $i++) {
-            $selected[] = $chars_alphabet[secure_random_number(0, count($chars_alphabet) - 1)];
+            $selected[] = $chars_alphabet[secure_rand(0, count($chars_alphabet) - 1)];
         }
 
         /* Now delete all other glyphs in the array such that we can work with $alphabet */
@@ -313,17 +366,17 @@ EOD;
             $min = new Point(0, 0);
             $max = new Point($this->width, $this->height);
             // Get a start point
-            $previous = $startp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+            $previous = $startp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
             // Of how many random geometrical primitives should our random shape consist?
-            $ngp = secure_random_number(4, 9);
+            $ngp = secure_rand(min($this->dsettings["shapeify"]["r_num_gp"]), max($this->dsettings["shapeify"]["r_num_gp"]));
 
             foreach (range(0, $ngp) as $j) {
                 // Find a random endpoint for geometrical primitves
                 // If there are only 4 remaining shapes to add, choose a random point that
                 // is closer to the endpoint!
-                $rp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+                $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
                 if (($ngp - 4) <= $j) {
-                    $rp = new Point(secure_random_number($min->x, $max->x), secure_random_number($min->y, $max->y));
+                    $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
                     // Make the component closer to the startpoint that is currently wider away
                     // This ensures that the component switches over the iterations (most likely).
                     $axis = abs($startp->x - $rp->x) > abs($startp->y - $rp->y) ? 'x' : 'y';
@@ -348,7 +401,8 @@ EOD;
             return $rshapes;
         };
         // How many random shapes? 
-        $ns = secure_random_number(0, 5);
+        $ns = secure_rand(min($this->dsettings["shapeify"]["r_num_gp"]),
+                                        max($this->dsettings["shapeify"]["r_num_gp"]));
 
         foreach (range(0, $ns) as $i) {
             $random_shapes = array_merge($random_shapes, $random_shape());
@@ -366,7 +420,8 @@ EOD;
      */
     private function _maybe_change_curvature_degree(&$shapearray) {
         foreach ($shapearray as &$shape) {
-            $do_change = (bool) (secure_random_number(0, 5) == 5);
+            $p = $this->dsettings["change_degree"]["p"];
+            $do_change = (bool) (secure_rand(0, $p) == $p);
             if ($do_change && count($shape) == 3) {
                 self::V("changing curvature degree");
                 /*
@@ -400,7 +455,8 @@ EOD;
         $newshapes = array();
 
         foreach ($shapearray as $key => $shape) {
-            $do_change = (bool) (secure_random_number(0, 5) == 5);
+            $p = $this->dsettings["split_curve"]["p"];
+            $do_change = (bool) (secure_rand(0, $p) == $p);
             if ($do_change && count($shape) >= 3) {
                 self::V("splitting curve");
                 $left = array();
@@ -434,7 +490,8 @@ EOD;
         $merge = array(); // Accumulating the new shapes
 
         foreach ($shapearray as $key => $shape) {
-            $do_change = (bool) (secure_random_number(0, 3) == 3);
+            $p = $this->dsettings["approx_shapes"]["p"];
+            $do_change = (bool) (secure_rand(0, $p) == $p);
             if ($do_change) {
                 if ((count($shape) == 3 || count($shape) == 4)) {
                     self::V("approximating curve with lines");
@@ -497,7 +554,7 @@ EOD;
         $scale_factor = ($this->height / 2) / $my;
 
         $this->on_points(
-                $glyphs, array($this, "_scale"), array($scale_factor, $scale_factor)
+                $glyphs, array($this, "_scale"), array($scale_factor)
         );
 
         // And change their height/widths attributes manually
@@ -519,10 +576,10 @@ EOD;
         $overlapf = 2 / 3;
         foreach ($glyphs as &$glyph) {
             // Get a random x-offset based on the width of the previous glyph divided by two.
-            $accumulated_hoffset += secure_random_number($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
+            $accumulated_hoffset += secure_rand($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
             // Get a random y-offst based on the height of the current glyph.
             $h = round($glyph['height'] * $overlapf);
-            $yoffset = secure_random_number((10 > $h ? $h : 10), $h);
+            $yoffset = secure_rand((10 > $h ? $h : 10), $h);
             // Translate all points by the calculated offset.
             $this->on_points(
                     $glyph["glyph_data"], array($this, "_translate"), array($accumulated_hoffset, $yoffset)
@@ -538,7 +595,7 @@ EOD;
          * 
          */
         $this->width = $accumulated_hoffset + $glyph["width"] +
-                secure_random_number($glyph["width"] * $overlapf, $glyph["width"]);
+                secure_rand($glyph["width"] * $overlapf, $glyph["width"]);
     }
 
     /*
@@ -560,18 +617,30 @@ EOD;
 
     private function _get_random_transformations() {
         // Prepare some transformations with some random arguments.
-        $transformations = array(
-            array(array($this, "_rotate"), array($this->_ra())),
-            array(array($this, "_skew"), array($this->_ra())),
-            array(array($this, "_scale"), $this->_rs()),
-                //array(array($this, "_shear"), array(0.5, 0)),
-                // array(array($this, "_translate"), array(5, 5))
-        );
+        $transformations = array();
 
-        if (empty($transformations))
-            return Null;
+        if ($this->dsettings["transformations"]["rotate"]) {
+            $transformations[] = array(array($this, "_rotate"), array($this->_ra()));
+        }
+        if ($this->dsettings["transformations"]["skew"]) {
+            $transformations[] = array(array($this, "_skew"), array($this->_ra()));
+        }
+        if ($this->dsettings["transformations"]["scale"]) {
+            $transformations[] = array(array($this, "_scale"), array($this->_rs()));
+        }
+        if ($this->dsettings["transformations"]["shear"]) {
+            $transformations[] = array(array($this, "_shear"), array(1, 0));
+        }
+        if ($this->dsettings["transformations"]["translate"]) {
+            $transformations[] = array(array($this, "_translate"), array(0, 0));
+        }
 
-        $n = secure_random_number(0, count($transformations) - 1);
+        if (empty($transformations)) {
+            return (array) Null;
+        }
+
+        // How many random transformations to delete?
+        $n = secure_rand(0, count($transformations) - 1);
 
         shuffle_assoc($transformations);
 
@@ -617,8 +686,8 @@ EOD;
      * @return type integer.
      */
     private function _ra() {
-        $n = secure_random_number(0, 6) / 10;
-        if (secure_random_number(0, 1) == 1)
+        $n = secure_rand(0, 6) / 10;
+        if (secure_rand(0, 1) == 1)
             $n *= -1;
         return $n;
     }
@@ -629,8 +698,8 @@ EOD;
      * @return type integer.
      */
     private function _rs() {
-        $z = secure_random_number(8, 13) / 10;
-        return array($z, $z); // Let's be boring here...
+        $z = secure_rand(8, 13) / 10;
+        return $z;
     }
 
     /**
@@ -641,10 +710,11 @@ EOD;
      * @return integer The value between 0-1
      */
     private function _rt($inclusive = True) {
-        if ($inclusive)
-            $z = secure_random_number(0, 1000) / 1000;
-        else
-            $z = secure_random_number(1, 999) / 1000;
+        if ($inclusive) {
+            $z = secure_rand(0, 1000) / 1000;
+        } else {
+            $z = secure_rand(1, 999) / 1000;
+        }
         return $z;
     }
 
@@ -679,30 +749,39 @@ EOD;
      * Scales a point with $sx and $sy:
      * (x, y) = x*sx, y*sy
      * 
-     * @param type $p The point to scale.
-     * @param type $sx The scale factor for the x-component.
-     * @param type $sy The scale factor for the y-component.
+     * @param Point $p The point to scale.
+     * @param int $s The scale factor for the x/y-component.
      */
-    private function _scale($p, $sx = 1, $sy = 1) {
+    private function _scale($p, $s = 1) {
         $x = $p->x;
         $y = $p->y;
-        $p->x = $x * $sx;
-        $p->y = $y * $sy;
+        $p->x = $x * $s;
+        $p->y = $y * $s;
     }
 
     /**
-     * Applies a non uniform scaling in the direction specified by $ky and $ky.
-     * (x, y) = x + y*ky, y +x*kx
-     *
-     * @param type $p
-     * @param type $kx
-     * @param type $ky
+     * http://en.wikipedia.org/wiki/Shear_mapping
+     * 
+     * Displace every point horizontally by an amount proportionally
+     * to its y(horizontal shear) or x(vertical shear) coordinate. 
+     * 
+     * Horizontal shear: (x, y) = (x + mh*y, y)
+     * Vertical shear: (x, y) = (x, y + mv*x)
+     * 
+     * One shear factor needs always to be zero.
+     * 
+     * @param Point $p
+     * @param int $mh The shear factor for horizontal shear.
+     * @param int $mv The shear factor for vertical shear.
      */
-    private function _shear($p, $kx, $ky) {
+    private function _shear($p, $mh = 1, $mv = 0) {
+        if ($mh * $mv != 0) {
+            throw new InvalidArgumentException(__FUNCTION__ . " _shear called with invalid arguments $p mh: $mh mv: $mv");
+        }
         $x = $p->x;
         $y = $p->y;
-        $p->x = $x + $y * $ky;
-        $p->y = $y + $x * $kx;
+        $p->x = $x + $y * $mh;
+        $p->y = $y + $x * $mv;
     }
 
     /**
@@ -748,7 +827,7 @@ EOD;
         // line lengths? Yep, I actually DO remember something for once from my maths courses :/
         $d = sqrt(pow(abs($line[0]->x - $line[1]->x), 2) + pow(abs($line[0]->y - $line[1]->y), 2));
         // The control points are allowed to be maximally a 10th of the line width apart from the line distance.
-        $md = $d / secure_random_number(10, 50);
+        $md = $d / secure_rand(10, 50);
 
         $somewhere_near_the_line = function($line, $md) {
             // Such a point must be within the bounding rectangle of the line.
@@ -770,9 +849,9 @@ EOD;
             if ($maxx < 0 || $minx < 0) { // Some strange cases oO
                 $ma = max(abs($maxx), abs($minx));
                 $mi = min(abs($maxx), abs($minx));
-                $x = - secure_random_number($mi, $ma);
+                $x = - secure_rand($mi, $ma);
             } else {
-                $x = secure_random_number($minx, $maxx);
+                $x = secure_rand($minx, $maxx);
             }
             $y = $m * $x + $d;
 
@@ -807,7 +886,7 @@ EOD;
         }
 
         if (!$nlines || !isset($nlines)) {
-            $nlines = secure_random_number(4, 20);
+            $nlines = secure_rand(min($this->dsettings["approx_shapes"]["r_al_num_lines"]), max($this->dsettings["approx_shapes"]["r_al_num_lines"]));
         }
         $approx_func = nUlL; // because PHP sucks!
 
@@ -947,27 +1026,48 @@ class Point {
 }
 
 /**
- * For the future: Maybe hold some of the bytes in memory in a LUT such that we 
- * can avoid successive calls to openssl_random_pseudo_bytes().
+ * @author Nikolai Tschacher <admin@incolumitas.com>
  * 
- * Generates cryptographically secure random numbers within the range
- *      integer $start : start of the range
- *      integer $stop : end of the range.
+ * Generates cryptographically secure random numbers including the range $start to $stop with 
+ * good performance (especiall for ranges from 0-255)!
+ * Calls to openssl_random_pseudo_bytes() are cached in a array $LUT. 
+ * For instance, you need only around 2 calls to openssl_random_pseudo_bytes in order to obtain 
+ * 1000 random values between 0 and 200. This ensures good performance!
  *
- *      Both parameters need to be positive. If you need a negative random value, just pass positiv values
- *      to the function and then make the return value negative on your own.
+ * Both parameters need to be positive. If you need a negative random value, just pass positiv values
+ * to the function and then make the return value negative on your own.
  *
- *      return value: A random integer within the range (including the edges). If the function returns False, something
- *      went wrong. Always check for false with "===" operator, otherwise a fail might shadow a valid
- *      random value: zero. You can pass the boolean parameter $secure. If it is true, the random value is
- *      cryptographically secure, else it was generated with rand().
+ * If the function returns False, something went wrong.
+ * Always check for false with "===" operator, otherwise a fail might shadow a valid
+ * random value: zero. You can pass the boolean parameter $secure. If it is true, the random value is
+ * cryptographically secure, else it was generated with rand().
+ * 
+ * @staticvar array $LUT A lookup table to store bytes from calls to secure_random_number
+ * @param int $start The bottom border of the range.
+ * @param int $stop The top border of the range.
+ * @param in bool $secure Whether the call to openssl_random_pseudo_bytes was made securely.
+ * @param int $calls The number of calls already made.
+ * @return int A random integer within the range (including the edges).
+ * @throws InvalidArgumentException Thrown if the input range is invalid.
+ * @throws UnexpectedValueException Thrown if openssl_random_pseudo_bytes was called unsecurely.
+ * @throws ErrorException Thrown if unpack fails.
  */
-function secure_random_number($start, $stop, &$secure = "True") {
-    static $calls = 0;
-    $num_bytes = 1024;
-
-    if ($start < 0 || $stop < 0 || $stop < $start)
+function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
+    if ($start < 0 || $stop < 0 || $stop < $start) {
         throw new InvalidArgumentException("Either stop<start or negative input parameters. Arguments: start=$start, stop=$stop");
+    }
+    static $LUT; // Lookup table that holds always the last bytes as received by openssl_random_pseudo_bytes.
+    /* Before we do anything, lets see if we have a random value in the LUT */
+    if (is_array($LUT) && !empty($LUT)) {
+        foreach ($LUT as $key => $value) {
+            if ($value >= $start && $value <= $stop) {
+                $secure = True;
+                unset($LUT[$key]); // Next run, next value, as my dad always said!
+                return $value;
+            }
+        }
+    }
+    $num_bytes = 1024;
 
     /* Just look for a random value within the difference of the range */
     $range = abs($stop - $start);
@@ -985,13 +1085,19 @@ function secure_random_number($start, $stop, &$secure = "True") {
 
     /* Get a blob of cryptographically secure random bytes */
     $binary = openssl_random_pseudo_bytes($num_bytes, $crypto_strong);
-    if ($crypto_strong == False)
-        throw new UnexpectedValueException("openssl_random_bytes cannot access secure PRNG");
 
-    /* unpack data into determined format */
+    if ($crypto_strong == False) {
+        throw new UnexpectedValueException("openssl_random_bytes cannot access secure PRNG");
+    }
+
+    /* unpack data into previously determined format */
     $data = unpack($format . '*', $binary);
-    if ($data == False)
-        throw new UnexpectedValueException("unpack() failed.");
+    if ($data == False) {
+        throw new ErrorException("unpack() failed.");
+    }
+
+    //Update lookup-table
+    $LUT = $data;
 
     foreach ($data as $value) {
         $value = intval($value, $base = 10);
@@ -1005,8 +1111,9 @@ function secure_random_number($start, $stop, &$secure = "True") {
     if ($calls >= 50) { /* Fall back to rand() if the numbers of recursive calls exceed 50 */
         $secure = False;
         return rand($start, $stop);
-    } else /* If we could't locate integer in the range, try again as long as we do not try more than 50 times. */
-        return secure_random_number($start, $stop, $secure);
+    } else {/* If we could't locate integer in the range, try again as long as we do not try more than 50 times. */
+        return secure_rand($start, $stop, $secure, $calls);
+    }
 }
 
 /**
