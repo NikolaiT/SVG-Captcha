@@ -198,25 +198,6 @@ $alphabet = array(
 				array(new Point(260, 0), new Point(150, 170)), array(new Point(150, 170), new Point(50, 0)), array(new Point(50, 0), new Point(10, 0))
 		))
 	),
-	'k' => array(
-		'width' => 322,
-		'height' => 478,
-		'glyph_data' => array(
-			'cubic_splines' => array(
-				array(new Point(322, 389), new Point(322, 389), new Point(299, 441), new Point(280, 444)), array(new Point(280, 444), new Point(258, 448), new Point(249, 410), new Point(235, 393)), array(new Point(235, 393), new Point(222, 377), new Point(198, 349), new Point(202, 330)), array(new Point(202, 330), new Point(208, 292), new Point(246, 304), new Point(257, 267)), 
-				array(new Point(202, 330), new Point(208, 292), new Point(246, 304), new Point(257, 267)), array(new Point(257, 267), new Point(268, 235), new Point(290, 185), new Point(271, 157)), array(new Point(271, 157), new Point(259, 137), new Point(259, 134), new Point(236, 135)), array(new Point(236, 135), new Point(179, 138), new Point(47, 197), new Point(47, 197)), 
-				array(new Point(236, 135), new Point(179, 138), new Point(47, 197), new Point(47, 197)), array(new Point(194, 158), new Point(143, 168), new Point(61, 188), new Point(60, 234)), array(new Point(166, 292), new Point(200, 286), new Point(231, 258), new Point(246, 227)), array(new Point(246, 227), new Point(256, 209), new Point(263, 180), new Point(249, 164)), 
-				array(new Point(246, 227), new Point(256, 209), new Point(263, 180), new Point(249, 164)), array(new Point(249, 164), new Point(237, 150), new Point(212, 154), new Point(194, 158))
-			),
-			'lines' => array(
-				array(new Point(0, 17), new Point(21, 23)), array(new Point(21, 23), new Point(22, 475)), array(new Point(22, 475), new Point(74, 462)), array(new Point(74, 462), new Point(80, 431)), 
-				array(new Point(74, 462), new Point(80, 431)), array(new Point(80, 431), new Point(46, 447)), array(new Point(46, 447), new Point(52, 334)), array(new Point(52, 334), new Point(176, 312)), 
-				array(new Point(52, 334), new Point(176, 312)), array(new Point(176, 312), new Point(176, 359)), array(new Point(176, 359), new Point(209, 402)), array(new Point(209, 402), new Point(273, 478)), 
-				array(new Point(209, 402), new Point(273, 478)), array(new Point(273, 478), new Point(307, 451)), array(new Point(307, 451), new Point(322, 389)), array(new Point(47, 197), new Point(45, 5)), 
-				array(new Point(47, 197), new Point(45, 5)), array(new Point(45, 5), new Point(1, 0)), array(new Point(1, 0), new Point(0, 17)), array(new Point(60, 234), new Point(59, 310)), 
-				array(new Point(60, 234), new Point(59, 310)), array(new Point(59, 310), new Point(166, 292)), array(new Point(194, 158), new Point(194, 158))
-		))
-	),
 	'E' => array(
 		'width' => 370,
 		'height' => 680,

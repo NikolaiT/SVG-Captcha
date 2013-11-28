@@ -50,7 +50,7 @@
  * the control point of the previous command relative to the current point.
  * 
  */
-$obj = SVGCaptcha::getInstance(5, $width = 700, $height = 300, $difficulty = SVGCaptcha::MEDIUM);
+$obj = SVGCaptcha::getInstance(5, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
 $obj->generate();
 
 class SVGCaptcha {
@@ -72,7 +72,7 @@ class SVGCaptcha {
   <title>SVGCaptcha</title>
   <g>
     <path
-       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       style="fill:none;stroke:#000000;stroke-width:2px;stroke-linecap:round;stroke-linejoin:miter;stroke-opacity:1"
        d="{{pathdata}}"
        id="captcha" />
   </g>
@@ -86,10 +86,10 @@ EOD;
     // The boolean value with key "apply" indicates whether to use/apply the function.
     // "p indicates the probability 1/p of usages for the function.
     private $dsettings = array(
-        // h: The fraction of the maximally possible horizontal align based on the previous glyph. 
-        // v: The fraction of the maximally allowed vertical alignment based on the current glyph height.
+        // h: This coefficient multiplied with the previous glyph's width determines the minimal advance of the current glyph.
+        // v: The fraction of the maximally allowed vertical displacement based on the current glyph height.
         // mh: The minimal vertical offset expressed as the divisor of the current glyph height.
-        'glyph_offsetting' => array('apply' => True, 'h' => 0.75, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
+        'glyph_offsetting' => array('apply' => True, 'h' => 1, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
         'transformations' => array('apply' => False, 'rotate' => False, 'skew' => False, 'scale' => False, 'shear' => False, 'translate' => False),
         'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => NUll),
         'change_degree' => array('apply' => False, 'p' => 5),
@@ -146,8 +146,8 @@ EOD;
         if ($this->difficulty == self::EASY) {
             $this->dsettings["transformations"]["apply"] = True;
             $this->dsettings["transformations"]["rotate"] = True;
-            $this->dsettings["shapeify"]["apply"] = True;
-            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 5);
+            $this->dsettings["shapeify"]["apply"] = False;
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 4);
             $this->dsettings["shapeify"]["r_num_gp"] = range(2, 4);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 5;
@@ -242,6 +242,7 @@ EOD;
                     $packed[$key]['glyph_data'][] = $shape;
                 }
             }
+            $this->captcha_answer[] = $key;
         }
 
         /*
@@ -346,7 +347,7 @@ EOD;
         $this->svg_data = str_replace("{{height}}", $this->height, $this->svg_data);
         /* Update the d path attribute */
         $this->svg_data = str_replace("{{pathdata}}", $path_str, $this->svg_data);
-
+        echo implode($this->captcha_answer, "");
         echo $this->svg_data;
     }
 
