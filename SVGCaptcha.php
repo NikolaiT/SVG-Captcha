@@ -177,7 +177,7 @@ EOD;
             $this->dsettings["transformations"]["skew"] = True;
             $this->dsettings["transformations"]["scale"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
-            $this->dsettings["shapeify"]["r_num_shapes"] = range(0, 5);
+            $this->dsettings["shapeify"]["r_num_shapes"] = range(4, 5);
             $this->dsettings["shapeify"]["r_num_gp"] = range(3, 6);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 3;

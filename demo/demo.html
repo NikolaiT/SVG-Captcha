@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>SVGCaptcha</title>
+        <style>
+
+        </style>
+        <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+    </head>
+    <body>
+
+        <select name="captcha_difficulty">
+            <option value="easy" selected="selected">easy captcha</option>
+            <option value="medium">medium captcha</option>
+            <option value="hard">hard captcha</option>
+        </select>
+
+        <div id="svg_captcha"></div>
+
+        <div id="error"></div>
+
+        <script>
+            $("select")
+                    .change(function() {
+                        $("select option:selected").each(function() {
+                            var selected = {svgcaptcha_difficulty: $(this).attr("value")};
+                            $("#svg_captcha").load("demo.php", selected, function(response, status, xhr) {
+                                if (status == "error") {
+                                    var msg = "Sorry but there was an error: ";
+                                    $("#error").html(msg + xhr.status + " " + xhr.statusText);
+                                }
+                            });
+                        });
+                    })
+                    .change();
+        </script>
+
+    </body>
+</html>
