@@ -1,6 +1,22 @@
 <?php
 
 /**
+ * Todo:
+ * 
+ * - Add three alternative typefaces to glyphs.php and add a mechanism to chose a random typeface for the captcha.
+ * - Add wordpress plugin. Add ajax captcha refresh using jquery.
+ * - Read about admin menu plugin menu. 
+ * - Add menu to plugin.
+ */
+
+/*
+$obj = SVGCaptcha::getInstance(4, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
+$c = $obj->getSVGCaptcha();
+echo $c[1];
+echo "The solution is ".$c[0]." <br />";
+*/
+
+/**
  * This is SVGCaptcha!
  * 
  * @author Nikolai Tschacher <admin@incolumitas.com>
@@ -50,9 +66,6 @@
  * the control point of the previous command relative to the current point.
  * 
  */
-$obj = SVGCaptcha::getInstance(5, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
-$obj->generate();
-
 class SVGCaptcha {
 
     private static $instance = NULL;
@@ -114,11 +127,11 @@ EOD;
      * This constructor wrapper is called to create such a unique instance. If this is called more than 
      * once, it just returns the single instance of SVGCaptcha that it keeps in a static variable.
      * 
-     * @param type $numchars
-     * @param type $width
-     * @param type $height
-     * @param type $difficulty
-     * @return type
+     * @param int $numchars The number of glyphs that the captcha will contain.
+     * @param int $width The width (in pixels) of the captcha.
+     * @param int $height The height of the captcha.
+     * @param int $difficulty The difficulty of the captcha to generate. Bigger values tend to decrease the performance.
+     * @return SVGCaptcha An unique instance of this class.
      */
     public function getInstance($numchars, $width, $height, $difficulty = SVGCaptcha::MEDIUM) {
         if (!isset(self::$instance))
@@ -144,6 +157,8 @@ EOD;
         // Set the parameters for the algorithms according to the user 
         // supplied difficulty.
         if ($this->difficulty == self::EASY) {
+            $this->dsettings["glyph_offseting"]["apply"] = True;
+            $this->dsettings["glyph_offseting"]["h"] = 0.5;
             $this->dsettings["transformations"]["apply"] = True;
             $this->dsettings["transformations"]["rotate"] = True;
             $this->dsettings["shapeify"]["apply"] = False;
@@ -151,7 +166,7 @@ EOD;
             $this->dsettings["shapeify"]["r_num_gp"] = range(2, 4);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 5;
-            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 10);
+            $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 20);
             $this->dsettings["change_degree"]["apply"] = True;
             $this->dsettings["change_degree"]["p"] = 5;
             $this->dsettings["split_curve"]["apply"] = True;
@@ -188,6 +203,15 @@ EOD;
             $this->dsettings["split_curve"]["apply"] = True;
         }
     }
+    
+    /**
+     * Wrapper around generate(). See this function for more info.
+     * 
+     * @return array()
+     */
+    public function getSVGCaptcha() {
+        return $this->generate();
+    }
 
     /**
      * This function generates a SVG d attribute of a path element. The d attribute represents the path data.
@@ -215,28 +239,27 @@ EOD;
      *       Hence, some more blurring techniques, especially for traditinoal attacks, are applied:
      * - Especially to prevent OCR techniques, independent random shapes are injected into the d attribute.
      * - Colorous background noise is not an option (That's just a css defintion in SVG).
+     * @return array The captcha answer and the svg output as array elements.
      */
-    public function generate() {
+    private function generate() {
         require "glyphs.php";
         /* Start by choosing $clength random glyphs from the alphabet and store them in $selected */
         $chars_alphabet = array_keys($alphabet);
+        $rand_key = function($alphabet_keys, $already_selected) {
+            $remaining = array_values(array_diff($alphabet_keys, $already_selected));
+            return $remaining[secure_rand(0, count($remaining) - 1)];
+        };
+        $keys = array();
         for ($i = 0; $i < $this->numchars; $i++) {
-            $selected[] = $chars_alphabet[secure_rand(0, count($chars_alphabet) - 1)];
+            $key = $rand_key(array_keys($alphabet), $keys);
+            $selected[$key] = $alphabet[$key];
+            $keys[] = $key;
         }
-
-        /* Now delete all other glyphs in the array such that we can work with $alphabet */
-        foreach ($alphabet as $key => $value) {
-            if (in_array($key, $selected)) {
-                continue;
-            } else {
-                unset($alphabet[$key]);
-            }
-        }
-
+        
         /* Pack all shape types together for every remaining glyph. I am sure there are more elegant ways. */
-        foreach ($alphabet as $key => $value) {
-            $packed[$key]["width"] = $alphabet[$key]["width"];
-            $packed[$key]["height"] = $alphabet[$key]["height"];
+        foreach ($selected as $key => $value) {
+            $packed[$key]["width"] = $selected[$key]["width"];
+            $packed[$key]["height"] = $selected[$key]["height"];
             foreach ($value['glyph_data'] as $shapetype) {
                 foreach ($shapetype as $shape) {
                     $packed[$key]['glyph_data'][] = $shape;
@@ -325,6 +348,9 @@ EOD;
         $path_str = "";
         $begin_path = True;
         foreach ($shapearray as $key => &$shape) {
+            // Assign "random" float precision. For performance reasons with rand() instead of secure_rand.
+            array_map(function($p) { $p->x = sprintf("%.".  rand(3, 6) ."f", $p->x); $p->y = sprintf("%.".  rand(4, 7) ."f", $p->y);}, $shape);
+            
             if ($begin_path) {
                 $path_str .= "M {$shape[0]->x} {$shape[0]->y}";
                 $begin_path = False;
@@ -333,22 +359,24 @@ EOD;
             $path_str .= $this->_shape2_cmd($shape, True, True);
         }
 
-        $this->_write_SVG($path_str);
+        return $this->_write_SVG($path_str);
     }
 
     /**
      * This function replaces all parameters in the SVG skeleton with the computed
-     * values and finally echoes the SVG string.
+     * values and finally returns the SVG string.
      * 
-     * @param type $path_str The string holding the path data for the path d attribute.
+     * @param str $path_str The string holding the path data for the path d attribute.
+     * @return array An array of the captcha answer and the svg output for the captcha image.
      */
     private function _write_SVG($path_str) {
-        $this->svg_data = str_replace("{{width}}", $this->width, $this->svg_data);
-        $this->svg_data = str_replace("{{height}}", $this->height, $this->svg_data);
+        $svg_output = $this->svg_data;
+        $svg_output = str_replace("{{width}}", $this->width, $svg_output);
+        $svg_output = str_replace("{{height}}", $this->height, $svg_output);
         /* Update the d path attribute */
-        $this->svg_data = str_replace("{{pathdata}}", $path_str, $this->svg_data);
-        echo implode($this->captcha_answer, "");
-        echo $this->svg_data;
+        $svg_output = str_replace("{{pathdata}}", $path_str, $svg_output);
+
+        return array(implode($this->captcha_answer, ""), $svg_output);
     }
 
     /**
@@ -367,7 +395,9 @@ EOD;
      * Note: Currently, only the second construct is implemented due to the likely
      * difficulty involving the first idea.
      * 
-     * @param type $shapearray array
+     *
+     * @param array $shapearray
+     * @return array The shapearray merged with randomly generated shapes.
      */
     private function _shapeify($shapearray) {
         $random_shapes = array();
@@ -428,7 +458,8 @@ EOD;
      * 
      * Elevates maybe the curvature degree of a quadratic curve to a cubic curve.
      * 
-     * @param type $shapearray shape array
+     * @param array $shapearray
+     * @return bool Vacously true.
      */
     private function _maybe_change_curvature_degree(&$shapearray) {
         foreach ($shapearray as &$shape) {
@@ -460,7 +491,7 @@ EOD;
      * Split quadratic and cubic bezier curves in two components.
      * 
      * @param array $shapearray
-     * @return array
+     * @return array The updated shapearray.
      */
     private function _maybe_split_curve($shapearray) {
         // Holding a copy preserves messing up the argument array.
@@ -493,8 +524,8 @@ EOD;
      * Approximates maybe a curve with lines or maybe converts lines to quadratic or cubic 
      * bezier splines (With a slight curvaceous shape).
      * 
-     * @param type $shapearray The array holding all shapes.
-     * @param type $key The key indicating the current shape.
+     * @param array $shapearray The array holding all shapes.
+     * @return array The udpated shapearray.
      */
     private function _maybe_approximate_xor_make_curvaceous($shapearray) {
         // Holding a an array of keys to delete after the loop
@@ -528,9 +559,10 @@ EOD;
      * Transforms an array of points into its according SVG path command. Assumes that the 
      * "current point" is already existant.
      * 
-     * @param type $shape The array of points to convert.
-     * @param type $absolute Whether the $path command is absolute or not.
-     * @param type $explicit_moveto If we should add an explicit moveto before the command.
+     * @param array $shape The array of points to convert.
+     * @param bool $absolute Whether the $path command is absolute or not.
+     * @param bool $explicit_moveto If we should add an explicit moveto before the command.
+     * @return string The genearetd SVG command based on the arguments.
      */
     private function _shape2_cmd($shape, $absolute = True, $explicit_moveto = False) {
         if ($explicit_moveto) {
@@ -538,7 +570,7 @@ EOD;
         } else {
             $prefix = "";
         }
-
+        
         if (count($shape) == 2) { // Handle lines
             list($p1, $p2) = $shape;
             $cmd = "L {$p2->x} {$p2->y} ";
@@ -559,7 +591,7 @@ EOD;
      * Scales all the glyphs by the glyph with the biggest height such that 
      * the lagerst glyph is 2/3 of the pictue height.
      * 
-     * @param type $glyphs array
+     * @param array $glyphs All the glyphs of the shapearray. 
      */
     private function _scale_by_largest_glyph(&$glyphs) {
         // $this->width = 2 * $my*$what <=> $what = $this->width/2/$my
@@ -615,14 +647,14 @@ EOD;
                 secure_rand($glyph["width"] * $overlapf_h, $glyph["width"]);
     }
 
-    /*
+    /**
      * SHAKE IT BABY!
      * 
      * This function distorts the coordinate system of every glyph on two levels:
      * First it chooses a set of affine transformations randomly. Then it distorts the coordinate
      * system by feeding the transformations random arguments.
+     * @param array The glyphs to apply the affine transformations.
      */
-
     private function _apply_affine_transformations(&$glyphs) {
         foreach ($glyphs as &$glyph) {
             foreach ($this->_get_random_transformations() as $transformation) {
@@ -631,7 +663,12 @@ EOD;
             }
         }
     }
-
+    
+    /**
+     * Generates random transformations based on the difficulty settings.
+     * 
+     * @return array Returns an array of (random) transformations.
+     */
     private function _get_random_transformations() {
         // Prepare some transformations with some random arguments.
         $transformations = array();
@@ -675,9 +712,9 @@ EOD;
      * Applies the function $callback recursively on every point found in $data.
      * The $callback function needs to have a point as its first argument.
      * 
-     * @param type $data An array holding point instances.
-     * @param type $callback The function to call for any point.
-     * @param type $args An associative array with parameter names as keys and arguments as values.
+     * @param array $data An array holding point instances.
+     * @param array $callback The function to call for any point.
+     * @param array $args An associative array with parameter names as keys and arguments as values.
      */
     private function on_points(&$data, $callback, $args) {
         // Base step
@@ -700,7 +737,7 @@ EOD;
     /**
      * Returns a random angle.
      * 
-     * @return type integer.
+     * @return int
      */
     private function _ra() {
         $n = secure_rand(0, 6) / 10;
@@ -712,7 +749,7 @@ EOD;
     /**
      * Returns a random scale factor.
      * 
-     * @return type integer.
+     * @return int
      */
     private function _rs() {
         $z = secure_rand(8, 13) / 10;
@@ -724,7 +761,7 @@ EOD;
      * if $inclusive is True, including zero and 0.
      * 
      * @param bool $inclusive Description
-     * @return integer The value between 0-1
+     * @return int The value between 0-1
      */
     private function _rt($inclusive = True) {
         if ($inclusive) {
@@ -739,8 +776,8 @@ EOD;
      * Applies a rotation matrix on a point:
      * (x, y) = cos(a)*x - sin(a)*y, sin(a)*x + cos(a)*y
      * 
-     * @param type $p The point to rotate.
-     * @param type $a The rotation angle.
+     * @param Point $p The point to rotate.
+     * @param float $a The rotation angle.
      */
     private function _rotate($p, $a) {
         $x = $p->x;
@@ -753,8 +790,8 @@ EOD;
      * Applies a skew matrix on a point:
      * (x, y) = x+sin(a)*y, y
      * 
-     * @param type $p The point to skew.
-     * @param type $a The skew angle.
+     * @param Point $p The point to skew.
+     * @param float $a The skew angle.
      */
     private function _skew($p, $a) {
         $x = $p->x;
@@ -767,7 +804,7 @@ EOD;
      * (x, y) = x*sx, y*sy
      * 
      * @param Point $p The point to scale.
-     * @param int $s The scale factor for the x/y-component.
+     * @param float $s The scale factor for the x/y-component.
      */
     private function _scale($p, $s = 1) {
         $x = $p->x;
@@ -788,8 +825,8 @@ EOD;
      * One shear factor needs always to be zero.
      * 
      * @param Point $p
-     * @param int $mh The shear factor for horizontal shear.
-     * @param int $mv The shear factor for vertical shear.
+     * @param float $mh The shear factor for horizontal shear.
+     * @param float $mv The shear factor for vertical shear.
      */
     private function _shear($p, $mh = 1, $mv = 0) {
         if ($mh * $mv != 0) {
@@ -804,9 +841,9 @@ EOD;
     /**
      * Translates the point by the given $dx and $dy.
      * (x, y) = x + dx, y + dy
-     * @param type $p
-     * @param type $dx
-     * @param type $dy
+     * @param Point $p
+     * @param float $dx
+     * @param float $dy
      */
     private function _translate($p, $dx, $dy) {
         $x = $p->x;
@@ -817,8 +854,8 @@ EOD;
 
     /**
      * 
-     * @param type $line
-     * @return type
+     * @param array $line
+     * @return array An array of points constituting the approximated line.
      */
     private function _approximate_line($line) {
         if (count($line) != 2 || !($line[0] instanceof Point) || !($line[1] instanceof Point)) {
@@ -892,8 +929,8 @@ EOD;
      * Approximates a quadratic/cubic Bezier curves by $nlines lines. If $nlines is False or unset, a random $nlines 
      * between 10 and 20 is chosen.
      * 
-     * @param type $curve An array of three or four points representing a quadratic or cubic Bezier curve.
-     * @return type Returns an array of lines (array of two points).
+     * @param array $curve An array of three or four points representing a quadratic or cubic Bezier curve.
+     * @return array Returns an array of lines (array of two points).
      */
     private function _approximate_bezier($curve, $nlines = False) {
         // Check that we deal with Point arrays only.
@@ -954,10 +991,10 @@ EOD;
      * This functon splits a curve at a given point t and returns two subcurves:
      * The right and left one. Note: The right array needs to be reversed before useage.
      * 
-     * @param type $curve The curve to split.
-     * @param type $t The parameter t where to split the curve.
-     * @param type $left The left subcurve. Passed by reference.
-     * @param type $right The right subcurve. Passed by reference.
+     * @param array $curve The curve to split.
+     * @param float $t The parameter t where to split the curve.
+     * @param array $left The left subcurve. Passed by reference.
+     * @param  array The right subcurve. Passed by reference.
      * @throws InvalidArgumentException If an array other than full of Points is given.
      */
     private function _split_curve($curve, $t, &$left, &$right) {
@@ -1139,7 +1176,7 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
 /**
  * Shuffle an array while preserving key/value mappings.
  * 
- * @param type $array The array to shuffle.
+ * @param array $array The array to shuffle.
  * @return boolean Whether the action was successful.
  */
 function shuffle_assoc(&$array) {
@@ -1157,7 +1194,7 @@ function shuffle_assoc(&$array) {
 
 /**
  *  Some handy debugging functions. Send me a letter for Christmas! 
- * @param type $array The array to print recursivly.
+ * @param array $array The array to print recursivly.
  */
 function D($a) {
     print "<pre>";
