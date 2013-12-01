@@ -8,13 +8,12 @@
  * - Read about admin menu plugin menu. 
  * - Add menu to plugin.
  */
-
 /*
-$obj = SVGCaptcha::getInstance(4, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
-$c = $obj->getSVGCaptcha();
-echo $c[1];
-echo "The solution is ".$c[0]." <br />";
-*/
+  $obj = SVGCaptcha::getInstance(4, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
+  $c = $obj->getSVGCaptcha();
+  echo $c[1];
+  echo "The solution is ".$c[0]." <br />";
+ */
 
 /**
  * This is SVGCaptcha!
@@ -103,6 +102,7 @@ EOD;
         // v: The fraction of the maximally allowed vertical displacement based on the current glyph height.
         // mh: The minimal vertical offset expressed as the divisor of the current glyph height.
         'glyph_offsetting' => array('apply' => True, 'h' => 1, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
+        'glyph_fragments' => array('apply' => False, 'r_num_frag' => NULL, 'frag_factor' => 2),
         'transformations' => array('apply' => False, 'rotate' => False, 'skew' => False, 'scale' => False, 'shear' => False, 'translate' => False),
         'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => NUll),
         'change_degree' => array('apply' => False, 'p' => 5),
@@ -157,6 +157,8 @@ EOD;
         // Set the parameters for the algorithms according to the user 
         // supplied difficulty.
         if ($this->difficulty == self::EASY) {
+            $this->dsettings['glyph_fragments']['apply'] = True;
+            $this->dsettings['glyph_fragments']['r_num_frag'] = range(2, 4);
             $this->dsettings["glyph_offseting"]["apply"] = True;
             $this->dsettings["glyph_offseting"]["h"] = 0.5;
             $this->dsettings["transformations"]["apply"] = True;
@@ -170,7 +172,6 @@ EOD;
             $this->dsettings["change_degree"]["apply"] = True;
             $this->dsettings["change_degree"]["p"] = 5;
             $this->dsettings["split_curve"]["apply"] = True;
-            
         } else if ($this->difficulty == self::MEDIUM) {
             $this->dsettings["transformations"]["apply"] = True;
             $this->dsettings["transformations"]["rotate"] = True;
@@ -178,7 +179,7 @@ EOD;
             $this->dsettings["transformations"]["scale"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
             $this->dsettings["shapeify"]["r_num_shapes"] = range(4, 5);
-            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 6);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 4);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 3;
             $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(4, 16);
@@ -194,7 +195,7 @@ EOD;
             $this->dsettings["transformations"]["translate"] = True;
             $this->dsettings["shapeify"]["apply"] = True;
             $this->dsettings["shapeify"]["r_num_shapes"] = range(3, 8);
-            $this->dsettings["shapeify"]["r_num_gp"] = range(4, 8);
+            $this->dsettings["shapeify"]["r_num_gp"] = range(3, 5);
             $this->dsettings["approx_shapes"]["apply"] = True;
             $this->dsettings["approx_shapes"]["p"] = 2;
             $this->dsettings["approx_shapes"]["r_al_num_lines"] = range(6, 26);
@@ -203,7 +204,7 @@ EOD;
             $this->dsettings["split_curve"]["apply"] = True;
         }
     }
-    
+
     /**
      * Wrapper around generate(). See this function for more info.
      * 
@@ -224,6 +225,9 @@ EOD;
      * - Point representation changes from absolute to relative on a random base.
      * - Cubic Bezier curves are converted to quadratic splines and vice versa.
      * - Bezier curves are approximated by lines. Lines are represented as bezier curves.
+     * - Parts of glyphs (That is: Some of their geometrical primitives) are copied and inserted at some random place in the canvas. 
+     *   This technique spreads confusion for cracking parsers, since it becomes harder to distinguish between real glyphs and meaningless glyph fragments. Possible drawback:
+     *   Crackers have easier play to gues what glyhps are used, because more 'evidence' of glyphs is present.
      * - All input points undergo affine transformation matrices (Rotation/Skewing/Translation/Scaling).
      * - Random "components", such as holes or misformations (mandelbrot shapes for instance) are randomly injected into the shape definitions.
      * - The definition of the components (Which consists of geometrical primitives) that constitute each glyph, are arranged randomly.
@@ -244,18 +248,11 @@ EOD;
     private function generate() {
         require "glyphs.php";
         /* Start by choosing $clength random glyphs from the alphabet and store them in $selected */
-        $chars_alphabet = array_keys($alphabet);
-        $rand_key = function($alphabet_keys, $already_selected) {
-            $remaining = array_values(array_diff($alphabet_keys, $already_selected));
-            return $remaining[secure_rand(0, count($remaining) - 1)];
-        };
-        $keys = array();
-        for ($i = 0; $i < $this->numchars; $i++) {
-            $key = $rand_key(array_keys($alphabet), $keys);
+        $selected_keys = array_secure_rand($alphabet, $this->numchars, False);
+        foreach ($selected_keys as $key) {
             $selected[$key] = $alphabet[$key];
-            $keys[] = $key;
         }
-        
+
         /* Pack all shape types together for every remaining glyph. I am sure there are more elegant ways. */
         foreach ($selected as $key => $value) {
             $packed[$key]["width"] = $selected[$key]["width"];
@@ -293,10 +290,15 @@ EOD;
             $this->_align_randomly($packed);
         }
 
+        /* Replicate glyph fragments and insert them at random positions */
+        if ($this->dsettings['glyph_fragments']['apply']) {
+            $packed = $this->_glyph_fragments($packed);
+            //D($packed);
+        }
+
         /*
          * Finally, we generate a single array of shapes, and then shuffle it. Therefore we cannot 
          * longer distinguish which shape belongs to which glyph.
-         * 
          */
         foreach ($packed as $char => $value) {
             foreach ($value["glyph_data"] as $shape) {
@@ -349,8 +351,11 @@ EOD;
         $begin_path = True;
         foreach ($shapearray as $key => &$shape) {
             // Assign "random" float precision. For performance reasons with rand() instead of secure_rand.
-            array_map(function($p) { $p->x = sprintf("%.".  rand(3, 6) ."f", $p->x); $p->y = sprintf("%.".  rand(4, 7) ."f", $p->y);}, $shape);
-            
+            array_map(function($p) {
+                $p->x = sprintf("%." . rand(3, 6) . "f", $p->x);
+                $p->y = sprintf("%." . rand(4, 7) . "f", $p->y);
+            }, $shape);
+
             if ($begin_path) {
                 $path_str .= "M {$shape[0]->x} {$shape[0]->y}";
                 $begin_path = False;
@@ -358,7 +363,7 @@ EOD;
 
             $path_str .= $this->_shape2_cmd($shape, True, True);
         }
-
+        $this->D("mtest");
         return $this->_write_SVG($path_str);
     }
 
@@ -377,6 +382,54 @@ EOD;
         $svg_output = str_replace("{{pathdata}}", $path_str, $svg_output);
 
         return array(implode($this->captcha_answer, ""), $svg_output);
+    }
+
+    /**
+     * Takes the prechosen glyphs as input and copies random shapes of some
+     * randomly chosen glyhs and randomly translates them and adds them to the glyhp array.
+     * 
+     * @param array $glyphs The glyph array.
+     * @return array The modified glyph array.
+     */
+    private function _glyph_fragments($glyphs) {
+        //echo "In the beginning : "; D($glyphs);
+        // How many glyph fragments? If it is bigger than $glyph, just use count($glyphs)-1
+        if (!empty($this->dsettings['glyph_fragments']['r_num_frag'])) {
+            $ngf = max($this->dsettings['glyph_fragments']['r_num_frag']);
+            $ngf = $ngf >= count($glyphs) ? count($glyphs) - 1 : $ngf;
+        } else {
+            // If no range is specified in $dsettings
+            $ngf = secure_rand(0, count($glyphs) - 1);
+        }
+
+        // Choose a random range of glyph fragments.
+        $chosen_keys = array_secure_rand($glyphs, $ngf, True);
+
+        $glyph_fragments = array();
+        foreach ($chosen_keys as $key) {
+            // Get a key for the fragments
+            $ukey = uniqid($prefix = "gf__");
+            // Choose maximally half of all shapes that constitute the glyph
+            $shape_keys = array_secure_rand(
+                    $glyphs[$key]["glyph_data"], secure_rand(0, count($glyphs[$key]["glyph_data"]) / $this->dsettings['glyph_fragments']['frag_factor'])
+            );
+            // Determine translation and rotation parameters.
+            // In which x direction should the fragment be moved (Based on the very first shape in the fragment)?
+            // Don't try to understand it. It is rubbish code and badly written anyways.
+            if (count($shape_keys) > 0 && !empty($shape_keys)) {
+                $pos = (($rel = $glyphs[$key]["glyph_data"][$shape_keys[0]][0]->x) > $this->width / 2) ? false : true;
+                $x_translate = ($pos) ? secure_rand(abs($rel), $this->width) : - secure_rand(0, abs($rel));
+                $y_translate = (microtime() & 1) ? -secure_rand(0, $this->width / 5) : secure_rand(0, $this->width / 5);
+                $a = $this->_ra(0.6);
+                foreach ($shape_keys as $skey) {
+                    $copy = array_copy($glyphs[$key]["glyph_data"][$skey]);
+                    $this->on_points($copy, array($this, "_translate"), array($x_translate, $y_translate));
+                    $this->on_points($copy, array($this, "_rotate"), array($a));
+                    $glyph_fragments[$ukey]["glyph_data"][] = $copy;
+                }
+            }
+        }
+        return array_merge($glyph_fragments, $glyphs);
     }
 
     /**
@@ -402,55 +455,60 @@ EOD;
     private function _shapeify($shapearray) {
         $random_shapes = array();
 
-        $random_shape = function() {
-            $rshapes = array();
-            // Bounding points that constrain the maximal shape expansion
-            $min = new Point(0, 0);
-            $max = new Point($this->width, $this->height);
-            // Get a start point
-            $previous = $startp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
-            // Of how many random geometrical primitives should our random shape consist?
-            $ngp = secure_rand(min($this->dsettings["shapeify"]["r_num_gp"]), max($this->dsettings["shapeify"]["r_num_gp"]));
-
-            foreach (range(0, $ngp) as $j) {
-                // Find a random endpoint for geometrical primitves
-                // If there are only 4 remaining shapes to add, choose a random point that
-                // is closer to the endpoint!
-                $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
-                if (($ngp - 4) <= $j) {
-                    $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
-                    // Make the component closer to the startpoint that is currently wider away
-                    // This ensures that the component switches over the iterations (most likely).
-                    $axis = abs($startp->x - $rp->x) > abs($startp->y - $rp->y) ? 'x' : 'y';
-                    if ($axis === 'x') {
-                        $rp->x += ($startp->x > $rp->x) ? abs($startp->x - $rp->x) / 4 : abs($startp->x - $rp->x) / -4;
-                    } else {
-                        $rp->y += ($startp->y > $rp->y) ? abs($startp->y - $rp->y) / 4 : abs($startp->y - $rp->y) / -4;
-                    }
-                }
-
-                if ($j == ($ngp - 1)) { // Close the shape. With a line
-                    $rshapes[] = array($previous, $startp);
-                    break;
-                } else if (rand(0, 1) == 1) { // Add a line
-                    $rshapes[] = array($previous, $rp);
-                } else { // Add quadratic bezier curve
-                    $rshapes[] = array($previous, new Point($previous->x, $rp->y), $rp);
-                }
-
-                $previous = $rp;
-            }
-            return $rshapes;
-        };
         // How many random shapes? 
-        $ns = secure_rand(min($this->dsettings["shapeify"]["r_num_shapes"]),
-                                        max($this->dsettings["shapeify"]["r_num_shapes"]));
+        $ns = secure_rand(min($this->dsettings["shapeify"]["r_num_shapes"]), max($this->dsettings["shapeify"]["r_num_shapes"]));
 
         foreach (range(0, $ns) as $i) {
-            $random_shapes = array_merge($random_shapes, $random_shape());
+            $random_shapes = array_merge($random_shapes, $this->_random_shape());
         }
 
         return array_merge($shapearray, $random_shapes);
+    }
+
+    /**
+     * Generates a randomly placed shape in the coordinate system.
+     * 
+     * @return array An array of arrays constituting glyphs.
+     */
+    private function _random_shape() {
+        $rshapes = array();
+        // Bounding points that constrain the maximal shape expansion
+        $min = new Point(0, 0);
+        $max = new Point($this->width, $this->height);
+        // Get a start point
+        $previous = $startp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
+        // Of how many random geometrical primitives should our random shape consist?
+        $ngp = secure_rand(min($this->dsettings["shapeify"]["r_num_gp"]), max($this->dsettings["shapeify"]["r_num_gp"]));
+
+        foreach (range(0, $ngp) as $j) {
+            // Find a random endpoint for geometrical primitves
+            // If there are only 4 remaining shapes to add, choose a random point that
+            // is closer to the endpoint!
+            $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
+            if (($ngp - 4) <= $j) {
+                $rp = new Point(secure_rand($min->x, $max->x), secure_rand($min->y, $max->y));
+                // Make the component closer to the startpoint that is currently wider away
+                // This ensures that the component switches over the iterations (most likely).
+                $axis = abs($startp->x - $rp->x) > abs($startp->y - $rp->y) ? 'x' : 'y';
+                if ($axis === 'x') {
+                    $rp->x += ($startp->x > $rp->x) ? abs($startp->x - $rp->x) / 4 : abs($startp->x - $rp->x) / -4;
+                } else {
+                    $rp->y += ($startp->y > $rp->y) ? abs($startp->y - $rp->y) / 4 : abs($startp->y - $rp->y) / -4;
+                }
+            }
+
+            if ($j == ($ngp - 1)) { // Close the shape. With a line
+                $rshapes[] = array($previous, $startp);
+                break;
+            } else if (rand(0, 1) == 1) { // Add a line
+                $rshapes[] = array($previous, $rp);
+            } else { // Add quadratic bezier curve
+                $rshapes[] = array($previous, new Point($previous->x, $rp->y), $rp);
+            }
+
+            $previous = $rp;
+        }
+        return $rshapes;
     }
 
     /**
@@ -570,7 +628,7 @@ EOD;
         } else {
             $prefix = "";
         }
-        
+
         if (count($shape) == 2) { // Handle lines
             list($p1, $p2) = $shape;
             $cmd = "L {$p2->x} {$p2->y} ";
@@ -619,16 +677,17 @@ EOD;
         $lastxo = 0;
         $lastyo = 0;
         $cnt = 0;
+
         $overlapf_h = $this->dsettings["glyph_offsetting"]["h"]; // Successive glyphs overlap previous glyphs at least to overlap * length of the previous glyphs.
         $overlapf_v = $this->dsettings["glyph_offsetting"]["v"]; // The maximal y-offset based on the current glyph height.
         foreach ($glyphs as &$glyph) {
             // Get a random x-offset based on the width of the previous glyph divided by two.
-            $accumulated_hoffset += ($cnt == 0) ? 0 : secure_rand($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
+            $accumulated_hoffset += ($cnt == 0) ? $glyph['width'] / 3 : secure_rand($lastxo, ($glyph["width"] > $lastxo) ? $glyph["width"] : $lastxo);
             // Get a random y-offst based on the height of the current glyph.
             $h = round($glyph['height'] * $overlapf_v);
-            $svo = $this->height/$this->dsettings["glyph_offsetting"]["mh"];
+            $svo = $this->height / $this->dsettings["glyph_offsetting"]["mh"];
             $yoffset = secure_rand(($svo > $h ? 0 : $svo), $h);
-            // Translate all points by the calculated offset. Except the very firs glyph. This should start left aligned.
+            // Translate all points by the calculated offset. Except the very firs glyph. It should start left aligned.
             $this->on_points(
                     $glyph["glyph_data"], array($this, "_translate"), array($accumulated_hoffset, $yoffset)
             );
@@ -663,7 +722,7 @@ EOD;
             }
         }
     }
-    
+
     /**
      * Generates random transformations based on the difficulty settings.
      * 
@@ -737,10 +796,11 @@ EOD;
     /**
      * Returns a random angle.
      * 
+     * @param int (Optional). Specifies the upper bound in radian.
      * @return int
      */
-    private function _ra() {
-        $n = secure_rand(0, 6) / 10;
+    private function _ra($ub=null) {
+        $n = secure_rand(0, $ub != null ? $ub : 4) / 10;
         if (secure_rand(0, 1) == 1)
             $n *= -1;
         return $n;
@@ -1034,6 +1094,7 @@ EOD;
                 ini_set('display_errors', 'On');
             }
             error_reporting(E_ALL);
+            echo "Memory peak usage: " . memory_get_peak_usage() . " And usage now" . memory_get_usage() . " <br />";
             echo '[Debug] - ' . $msg . '<br />';
         }
     }
@@ -1127,7 +1188,7 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
         $format = 'L';
         $num_bytes <<= 3;
     }
-    
+
     /* Before we do anything, lets see if we have a random value in the LUT within our range */
     if (is_array($LUT) && !empty($LUT) && $last_lu === $format) {
         foreach ($LUT as $key => $value) {
@@ -1174,6 +1235,47 @@ function secure_rand($start, $stop, &$secure = "True", $calls = 0) {
 }
 
 /**
+ * Secure replacement for array_rand().
+ * 
+ * @param array $input The input array.
+ * @param int $num_el (Optional). How many elements to choose from the input array.
+ * @param bool $allow_duplicates (Optional). Whether to allow choosing random values more than once.
+ * @return array Returns the keys of the picked elements.
+ */
+function array_secure_rand($input, $num_el = 1, $allow_duplicates = False) {
+    if ($num_el > count($input)) {
+        throw new InvalidArgumentException('Cannot choose more random keys from input that are in the array: input_size: ' . count($input) . ' and num_to_pick' . $num_el);
+    }
+    $keys = array_keys($input);
+    $chosen_keys = array();
+
+    if ($allow_duplicates) {
+        for ($i = 0; $i < $num_el; $i++) {
+            $chosen_keys[] = $keys[secure_rand(0, count($input) - 1)];
+        }
+    } else {
+        $already_used = array();
+        for ($i = 0; $i < $num_el; $i++) {
+            $key = pick_remaining($keys, $already_used);
+            $chosen_keys[] = $key;
+            $already_used[] = $key;
+        }
+    }
+
+    return $chosen_keys;
+}
+
+/**
+ * Little helper function for array_secure_rand().
+ * 
+ * @return mixed Returns a key that is in $key_pool but no in $already_picked
+ */
+function pick_remaining($key_pool, $already_picked) {
+    $remaining = array_values(array_diff($key_pool, $already_picked));
+    return $remaining[secure_rand(0, count($remaining) - 1)];
+}
+
+/**
  * Shuffle an array while preserving key/value mappings.
  * 
  * @param array $array The array to shuffle.
@@ -1190,6 +1292,27 @@ function shuffle_assoc(&$array) {
     $array = $new;
 
     return true;
+}
+
+/**
+ * Copies arrays while shallow copying their values.
+ * 
+ * http://stackoverflow.com/questions/6418903/how-to-clone-an-array-of-objects-in-php
+ * 
+ * @param array $arr The array to copy
+ * @return array
+ */
+function array_copy($arr) {
+    $newArray = array();
+    foreach ($arr as $key => $value) {
+        if (is_array($value))
+            $newArray[$key] = array_copy($value);
+        elseif (is_object($value))
+            $newArray[$key] = clone $value;
+        else
+            $newArray[$key] = $value;
+    }
+    return $newArray;
 }
 
 /**

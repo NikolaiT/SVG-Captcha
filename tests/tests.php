@@ -2,7 +2,18 @@
 
 error_reporting(E_ALL);
 
-list($p1, $p2, $p3, $p4, $p5) = range(0, 10);
+$a = array("alpha" => 2433, "beta" => array(1,2, 3,4));
 
+$b  = $a;
 
-var_dump($p4, $p1);
+$b["gamma"] = array(1, 2, 34,5);
+$b["beta"][0] = 777;
+
+D($a);
+D($b);
+
+function D($a) {
+    print "<pre>";
+    print_r($a);
+    print "</pre>";
+}

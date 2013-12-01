@@ -4,25 +4,30 @@
         <meta charset="utf-8">
         <title>SVGCaptcha</title>
         <style>
-
+            #select-container {
+                padding-bottom: 20px;
+            }
         </style>
         <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
     </head>
     <body>
-
-        <select name="captcha_difficulty">
-            <option value="easy" selected="selected">easy captcha</option>
-            <option value="medium">medium captcha</option>
-            <option value="hard">hard captcha</option>
-        </select>
-
+        <h2>SVGCaptcha Demo — Select a captcha with different difficulty levels</h2>
+        
+        <div id="select-container">
+            <select id="captcha_select" name="captcha_difficulty">
+                <option value="easy" selected="selected">easy captcha</option>
+                <option value="medium">medium captcha</option>
+                <option value="hard">hard captcha</option>
+            </select>
+        </div>
+        
         <div id="svg_captcha"></div>
 
         <div id="error"></div>
 
         <script>
-            $("select")
-                    .change(function() {
+            $("#captcha_select")
+                    .click(function() {
                         $("select option:selected").each(function() {
                             var selected = {svgcaptcha_difficulty: $(this).attr("value")};
                             $("#svg_captcha").load("demo.php", selected, function(response, status, xhr) {
@@ -32,8 +37,7 @@
                                 }
                             });
                         });
-                    })
-                    .change();
+                    });
         </script>
 
     </body>
