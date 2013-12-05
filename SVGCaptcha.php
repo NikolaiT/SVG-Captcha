@@ -1,13 +1,4 @@
 <?php
-
-/**
- * Todo:
- * 
- * - Add three alternative typefaces to glyphs.php and add a mechanism to chose a random typeface for the captcha.
- * - Add wordpress plugin. Add ajax captcha refresh using jquery.
- * - Read about admin menu plugin menu. 
- * - Add menu to plugin.
- */
 /*
   $obj = SVGCaptcha::getInstance(4, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
   $c = $obj->getSVGCaptcha();
@@ -80,7 +71,7 @@ class SVGCaptcha {
    height="{{height}}"
    id="svgCaptcha"
    version="1.1"
-   style="border:solid 2px #0A0">
+   style="border:solid 2px #000">
   <title>SVGCaptcha</title>
   <g>
     <path
@@ -90,6 +81,8 @@ class SVGCaptcha {
   </g>
 </svg>
 EOD;
+    // The glyph outline data
+    private $alphabet;
     private $numchars = 0;
     private $width = 0;
     private $height = 0;
@@ -119,6 +112,7 @@ EOD;
 
     // The answer to the generated captcha.
     private $captcha_answer = "";
+    
 
     /**
      * Singleton pattern. A SVGCaptcha instance only exists once manages it's unique object.
@@ -149,7 +143,12 @@ EOD;
      * @param int $difficulty The difficulty of the captcha to generate. Bigger values tend to decrease the performance.
      */
     private function __construct($numchars, $width, $height, $difficulty) {
-        $this->numchars = $numchars;
+        include_once "glyphs.php";
+        
+        $this->alphabet = $alphabet;
+        
+        $this->numchars = ($numchars > count($this->alphabet) ? count($this->alphabet) : $numchars);
+
         $this->width = $width;
         $this->height = $height;
         $this->difficulty = $difficulty;
@@ -246,11 +245,10 @@ EOD;
      * @return array The captcha answer and the svg output as array elements.
      */
     private function generate() {
-        require "glyphs.php";
         /* Start by choosing $clength random glyphs from the alphabet and store them in $selected */
-        $selected_keys = array_secure_rand($alphabet, $this->numchars, False);
+        $selected_keys = array_secure_rand($this->alphabet, $this->numchars, False);
         foreach ($selected_keys as $key) {
-            $selected[$key] = $alphabet[$key];
+            $selected[$key] = $this->alphabet[$key];
         }
 
         /* Pack all shape types together for every remaining glyph. I am sure there are more elegant ways. */
