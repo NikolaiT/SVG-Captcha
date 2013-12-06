@@ -108,7 +108,19 @@ class SVGCaptchaWordpressPlugin {
         }
 
         $this->captcha_options = get_option('svgc_options');
-        $this->case_sensitive = key_exists("captcha_case_sensitive", $this->captcha_options) ? $this->captcha_options["captcha_case_sensitive"] : False;
+        // If the options are not set, set them to the default values.
+        if (empty($this->captcha_options)) {
+            foreach ($this->dsettings as $key => $value) {
+                foreach ($value['sd'] as $skey => $svalue) {
+                    if ($svalue[0] != False) {
+                        $options[$skey] = $svalue[0];
+                    }
+                }
+            }
+            $this->captcha_options = $options;
+        }
+
+        $this->case_sensitive = $this->captcha_options["captcha_case_sensitive"];
 
         $this->hook2wp();
     }
@@ -124,15 +136,17 @@ class SVGCaptchaWordpressPlugin {
         add_action('wp_ajax_nopriv_svgc_captcha_reload', array($this, 'svgc_captcha_reload'));
         add_action('wp_ajax_svgc_captcha_reload', array($this, 'svgc_captcha_reload'));
 
+        if ($this->captcha_options['enable_captcha_on_comments']) {
+            // Add captcha to comment form
+            add_filter('comment_form_defaults', array($this, 'svgc_comment_form_defaults')); // Add a filter to verify if the captcha in the comment section was correct.
+            add_filter('preprocess_comment', array($this, 'svgc_validate_comment_captcha'));
+        }
 
-        add_filter('comment_form_defaults', array($this, 'svgc_comment_form_defaults'));
-        // Add a filter to verify if the captch in the comment section was correct.
-        add_filter('preprocess_comment', array($this, 'svgc_validate_comment_captcha'));
-
-        // Ad custom captcha field to login form
-        add_action('login_form', array($this, 'svgc_login_form_defaults'));
-        // Validate captcha in login form.
-        add_filter('authenticate', array($this, 'svgc_validate_login_captcha'), 30, 3);
+        if ($this->captcha_options['enable_captcha_on_login']) {
+            // Ad custom captcha field to login form
+            add_action('login_form', array($this, 'svgc_login_form_defaults'));
+            add_filter('authenticate', array($this, 'svgc_validate_login_captcha'), 30, 3); // Validate captcha in login form.
+        }
 
         add_action('admin_menu', array($this, 'add_plugin_page'));
         add_action('admin_init', array($this, 'page_init'));
@@ -258,42 +272,34 @@ class SVGCaptchaWordpressPlugin {
      */
     public function svgc_get_captcha() {
         // and immediately create a instance determined by the specified settings (if given) or else by the default variables.
-
         $lu = array('easy' => SVGCaptcha::EASY, 'medium' => SVGCaptcha::MEDIUM, 'hard' => SVGCaptcha::HARD);
+        // Check if we have a custom specified captcha or a predefined one (easy/medium/hard)
+        if ($this->captcha_options["custom_captcha"] == True) {
+            $custom_settings = array(
+                'glyph_offsetting' => array('apply' => False, 'h' => 1, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
+                'glyph_fragments' => array('apply' => False, 'r_num_frag' => range(0, 6), 'frag_factor' => 2),
+                'transformations' => array('apply' => False, 'rotate' => True, 'skew' => True, 'scale' => True, 'shear' => False, 'translate' => True),
+                'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => range(10, 30)),
+                'change_degree' => array('apply' => False, 'p' => 5),
+                'split_curve' => array('apply' => False, 'p' => 5),
+                'shapeify' => array('apply' => False, 'r_num_shapes' => range(0, 6), 'r_num_gp' => range(4, 10))
+            );
+            foreach ($custom_settings as $key => $value) {
+                $custom_settings[$key]["apply"] = $this->captcha_options["cg_" . $key];
+            }
 
-        if (!isset($this->captcha_options) || empty($this->captcha_options)) {
-            // Use default settings
             $this->svgCaptcha = SVGCaptcha::getInstance(
-                            $this->dsettings["general_settings"]["sd"]["captcha_length"][0], $width = $this->dsettings["general_settings"]["sd"]["captcha_width"][0], $height = $this->dsettings["general_settings"]["sd"]["captcha_height"][0], $difficulty = $lu[$this->dsettings["general_settings"]["sd"]["captcha_difficulty"][0]]
+                            $this->captcha_options['captcha_length'], $width = $this->captcha_options['captcha_width'], $height = $this->captcha_options['captcha_height'], $difficulty = $custom_settings
             );
         } else {
-            // Check if we have a custom specified captcha or a predefined one (easy/medium/hard)
-            if ($this->captcha_options["custom_captcha"] == True) {
-                $custom_settings = array(
-                    'glyph_offsetting' => array('apply' => False, 'h' => 1, 'v' => 0.5, 'mh' => 8), // Needs to be anabled by default
-                    'glyph_fragments' => array('apply' => False, 'r_num_frag' => range(0, 6), 'frag_factor' => 2),
-                    'transformations' => array('apply' => False, 'rotate' => True, 'skew' => True, 'scale' => True, 'shear' => False, 'translate' => True),
-                    'approx_shapes' => array('apply' => False, 'p' => 3, 'r_al_num_lines' => range(10, 30)),
-                    'change_degree' => array('apply' => False, 'p' => 5),
-                    'split_curve' => array('apply' => False, 'p' => 5),
-                    'shapeify' => array('apply' => False, 'r_num_shapes' => range(0, 6), 'r_num_gp' => range(4, 10))
-                );
-                foreach ($custom_settings as $key => $value) {
-                    $custom_settings[$key]["apply"] = $this->captcha_options["cg_" . $key];
-                }
-
-                $this->svgCaptcha = SVGCaptcha::getInstance(
-                                $this->captcha_options['captcha_length'], $width = $this->captcha_options['captcha_width'], $height = $this->captcha_options['captcha_height'], $difficulty = $custom_settings
-                );
-            } else {
-                $this->svgCaptcha = SVGCaptcha::getInstance(
-                                $this->captcha_options['captcha_length'], $width = $this->captcha_options['captcha_width'], $height = $this->captcha_options['captcha_height'], $difficulty = $lu[$this->captcha_options['captcha_difficulty']]
-                );
-            }
+            $this->svgCaptcha = SVGCaptcha::getInstance(
+                            $this->captcha_options['captcha_length'], $width = $this->captcha_options['captcha_width'], $height = $this->captcha_options['captcha_height'], $difficulty = $lu[$this->captcha_options['captcha_difficulty']]
+            );
         }
 
+
         list($this->captcha_answer, $this->svg_output) = $this->svgCaptcha->getSVGCaptcha();
-        
+
         $this->captcha_answer = ($this->captcha_options['captcha_case_sensitive'] == True) ? $this->captcha_answer : strtolower($this->captcha_answer);
 
         $_SESSION['svgc_solution'] = $this->captcha_answer;
@@ -317,7 +323,7 @@ class SVGCaptchaWordpressPlugin {
     public function add_plugin_page() {
         // This page will be under "Settings"
         $hook_suffix = add_options_page(
-                __('SVGCaptcha Options', 'SVGCaptcha'), __('SVGCaptcha Options', 'SVGCaptcha'), 'manage_options', 'svgc_submenu', array($this, 'create_admin_page')
+                __('SVG-Captcha settings', 'SVGCaptcha'), __('SVG-Captcha', 'SVGCaptcha'), 'manage_options', 'svgc_submenu', array($this, 'create_admin_page')
         );
 
         // Add javascript to the admin page
@@ -344,7 +350,9 @@ class SVGCaptchaWordpressPlugin {
      */
     public function create_admin_page() {
         // Set class property
-        $this->captcha_options = get_option('svgc_options');
+        if (get_option('svgc_options', False) != False) {
+            $this->captcha_options = get_option('svgc_options');
+        }
         ?>
         <div class="wrap">
             <?php screen_icon(); ?>
@@ -439,7 +447,8 @@ class SVGCaptchaWordpressPlugin {
     }
 
     public function checkbox_callback($d) {
-        $checked = isset($this->captcha_options[$d[0]]) ? checked($this->captcha_options[$d[0]], True, False) : checked($d[1], True, False);
+        $checked = isset($this->captcha_options[$d[0]]) ? checked($this->captcha_options[$d[0]], True, False) : checked($this->by_key($this->dsettings, $d[0]), True, False);
+
         printf(
                 '<input type="checkbox" id="%1$s" name="svgc_options[%1$s]" value="1" ' . $checked . ' />', esc_attr($d[0])
         );
@@ -460,6 +469,17 @@ class SVGCaptchaWordpressPlugin {
      */
     public function print_section_info() {
         print 'Enter your settings below: ';
+    }
+
+    public function by_key($arr, $key) {
+        if (isset($arr[$key])) {
+            return $arr[$key];
+        } else
+        if (is_array($arr)) {
+            foreach ($arr as $value) {
+                $this->by_key($value, $key);
+            }
+        }
     }
 
     /**
