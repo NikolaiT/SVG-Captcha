@@ -140,7 +140,8 @@ EOD;
      * @param int $numchars The number of glyphs the captcha will contain.
      * @param int $width The width of the captcha.
      * @param int $height The height of the captcha.
-     * @param int $difficulty The difficulty of the captcha to generate. Bigger values tend to decrease the performance.
+     * @param mixed $difficulty The difficulty of the captcha to generate. Larger difficulties tend to decrease the performance. If this argument is an
+     *                          array, the array is assumed to be a complete dsettings array and can be directly copied!
      */
     private function __construct($numchars, $width, $height, $difficulty) {
         include_once "glyphs.php";
@@ -201,6 +202,8 @@ EOD;
             $this->dsettings["change_degree"]["apply"] = True;
             $this->dsettings["change_degree"]["p"] = 3;
             $this->dsettings["split_curve"]["apply"] = True;
+        } else if (is_array($difficulty) && !empty($difficulty) && (empty(array_diff_key($difficulty, $this->dsettings)))) {
+            $this->dsettings = $difficulty;
         }
     }
 
