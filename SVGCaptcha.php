@@ -196,7 +196,7 @@ EOD;
             $this->dsettings["change_degree"]["apply"] = True;
             $this->dsettings["change_degree"]["p"] = 3;
             $this->dsettings["split_curve"]["apply"] = True;
-        } else if (is_array($difficulty) && !empty($difficulty) && (empty(array_diff_key($difficulty, $this->dsettings)))) {
+        } else if (is_array($difficulty) && !empty($difficulty) && (!array_diff_key($difficulty, $this->dsettings))) {
             $this->dsettings = $difficulty;
         }
     }
