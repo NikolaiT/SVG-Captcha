@@ -108,7 +108,7 @@ class SVGCaptchaWordpressPlugin {
         }
 
         $this->captcha_options = get_option('svgc_options');
-        $this->case_sensitive = $this->captcha_options["captcha_case_sensitive"];
+        $this->case_sensitive = key_exists("captcha_case_sensitive", $this->captcha_options) ? $this->captcha_options["captcha_case_sensitive"] : False;
 
         $this->hook2wp();
     }

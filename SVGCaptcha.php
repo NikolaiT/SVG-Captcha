@@ -1,11 +1,5 @@
 <?php
-/*
-  $obj = SVGCaptcha::getInstance(4, $width = 300, $height = 130, $difficulty = SVGCaptcha::EASY);
-  $c = $obj->getSVGCaptcha();
-  echo $c[1];
-  echo "The solution is ".$c[0]." <br />";
- */
-
+error_reporting(E_ALL);
 /**
  * This is SVGCaptcha!
  * 
