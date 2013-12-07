@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Plugin Name: SVGCaptcha
  * Plugin URI: http://incolumitas.com/SVGCaptcha
@@ -24,6 +23,8 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+
+defined('ABSPATH') or exit;
 
 class SVGCaptchaWordpressPlugin {
 
@@ -150,6 +151,38 @@ class SVGCaptchaWordpressPlugin {
 
         add_action('admin_menu', array($this, 'add_plugin_page'));
         add_action('admin_init', array($this, 'page_init'));
+
+        // upon deinstallation
+        register_uninstall_hook(__FILE__, array($this, 'on_uninstall'));
+        // upon activation
+        register_activation_hook(__FILE__, array($this, 'on_activation'));
+    }
+
+    public function on_uninstall() {
+        if (!current_user_can('activate_plugins'))
+            return;
+        check_admin_referer('bulk-plugins');
+
+        // Important: Check if the file is the one
+        // that was registered during the uninstall hook.
+        if (__FILE__ != WP_UNINSTALL_PLUGIN)
+            return;
+
+        if (!delete_option('svgc_options')) {
+            wp_die("Couldn't uninstall plugin");
+        }
+    }
+
+    public function on_activation() {
+        if (!current_user_can('activate_plugins'))
+            return;
+        $plugin = isset($_REQUEST['plugin']) ? $_REQUEST['plugin'] : '';
+        check_admin_referer("activate-plugin_{$plugin}");
+
+        // If there is such a option, delete it.
+        if (get_option('svgc_options', False) != False) {
+            delete_option('svgc_options');
+        }
     }
 
     /**
