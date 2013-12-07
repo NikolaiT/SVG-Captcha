@@ -23,11 +23,11 @@ echo $c[1]; // echoes the captcha itself.
 
 Here you get some examples (Please mind that the samples are converted to PNG, which means they are a bitmap format rather than a vector graphics format):
 
-A easy captcha: ![a easy captcha][easy]
+A easy captcha (difficulty-level: easy): ![a easy captcha][easy]
 
-A harder captcha(medium): ![a medium hard captcha][medium]
+A harder captcha (difficulty-level: medium): ![a medium hard captcha][medium]
 
-A pretty hard captcha(medium): ![a hard to decipher captcha][hard]
+A pretty hard captcha (difficulty-level: hard): ![a hard to decipher captcha][hard]
 
 ### What are the advantages of SVGCaptcha?
 
