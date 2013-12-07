@@ -22,27 +22,11 @@ echo $c[1]; // echoes the captcha itself.
 ### Examples
 
 Here you get some examples:
+![a easy captcha][easy]
 
-<figure>
-<object type="image/svg+xml" data="assets/easy.svg" 
-	width="300" height="200" border="1">
-</object>
-<figcaption>A easy SVG captcha</figcaption>
-</figure>
+![a medium hard captcha][medium]
 
-<figure>
-<object type="image/svg+xml" data="assets/medium.svg" 
-	width="300" height="200" border="1">
-</object>
-<figcaption>A medium SVG captcha</figcaption>
-</figure>
-
-<figure>
-<object type="image/svg+xml" data="assets/hard.svg" 
-	width="300" height="200" border="1">
-</object>
-<figcaption>A hard SVG captcha</figcaption>
-</figure>
+![a hard to decipher captcha][hard]
 
 ### What are the advantages of SVGCaptcha?
 
@@ -94,3 +78,7 @@ This *README* is mirroring the original site about SVG-Captcha. It is situated [
 
 [3]: http://incolumitas.com/about/contact/ "Contact with author"
 [4]: http://incolumitas.com/svgcaptcha/ "Oringal site"
+[easy]: assets/easy.png "Easy SVG-Captcha"
+[medium]: assets/medium.png "Medium SVG-Captcha"
+[hard]: assets/hard.png "Hard SVG-Captcha"
+
