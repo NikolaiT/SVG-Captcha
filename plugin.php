@@ -205,7 +205,7 @@ class SVGCaptchaWordpressPlugin {
                         <label class="col-sm-2 control-label" for="svgc_answer">' . __('Captcha', 'SVGCaptcha') . '<span class="required"> *</span></label>
                         <div class="col-sm-10">
                                 <input id="svgc_answer" class="form-control" name="svgc_answer" size="30" type="text" />
-                                <div id="SVGCaptchaContainer">' . $this->svg_output . '</div>
+                                <div id="SVGCaptchaContainer" style="padding: 10px 0px;">' . $this->svg_output . '</div>
                                 ' . $this->svgc_reload_link() . '
                         </div>
                     </div>';
@@ -214,7 +214,7 @@ class SVGCaptchaWordpressPlugin {
                         '<p class="comment-form-captcha"><label for="svgc_answer">' . __('Captcha', 'SVGCaptcha') . '</label>
                     <span class="required">*</span>
                     <input id="svgc_answer" name="svgc_answer" size="30" type="text" />
-                    <div id="SVGCaptchaContainer">' . $this->svg_output . '</div>
+                    <div id="SVGCaptchaContainer" style="padding: 10px 0px;">' . $this->svg_output . '</div>
                     ' . $this->svgc_reload_link();
             }
         }
@@ -242,7 +242,7 @@ class SVGCaptchaWordpressPlugin {
             ?>
 
             <div class="form-group">
-                <div id="SVGCaptchaContainer"><?php echo $this->svg_output ?></div>
+                <div id="SVGCaptchaContainer" style="padding: 10px 0px;"><?php echo $this->svg_output ?></div>
                 <?php echo $this->svgc_reload_link(); ?>
                 <label for="svgc_answer" class="col-sm-2 control-label"><?php _e('Captcha', 'SVGCaptcha') ?><span class="required"> *</span></label>
                 <input type="text" name="svgc_answer" id="svgc_answer" class="form-control" value="<?php echo esc_attr(stripslashes($user_captcha)); ?>" size="25" />
