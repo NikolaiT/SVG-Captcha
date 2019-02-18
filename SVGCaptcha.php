@@ -256,6 +256,7 @@ EOD;
                     $packed[$key]['glyph_data'][] = $shape;
                 }
             }
+            $this->captcha_answer = array();
             $this->captcha_answer[] = $key;
         }
 
